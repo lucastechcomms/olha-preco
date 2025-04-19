@@ -10,6 +10,7 @@ import { Picker } from '@react-native-picker/picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
+import firebase from 'firebase';
 
 // Estilos centralizados
 import { styles } from './Styles';
@@ -138,8 +139,9 @@ export function BarcodeScannerScreen({ navigation }) {
       setPreco("");
       setScanned(false);
     } catch (error) {
-      console.error('Erro ao salvar leitura:', error);
+      console.error('Erro ao salvar leitura:', error.message || error);
       Alert.alert("Erro", "Não foi possível salvar o preço.");
+      Alert.alert("Erro", `Não foi possível salvar o preço. ERROR ID: ${error.message || error}`);
     }
   };
 
@@ -192,8 +194,8 @@ export function BarcodeScannerScreen({ navigation }) {
         );
       }
     } catch (error) {
-      console.error('Erro ao salvar leitura:', error);
-      Alert.alert("Erro", "Falha ao salvar leitura.");
+      console.error('Erro ao salvar leitura:', error.message || error);
+      Alert.alert("Erro", `Falha ao salvar leitura. ERROR ID:  ${error.message || error}`);
       setScanned(false);
     }
   };
@@ -267,7 +269,7 @@ export function BarcodeScannerScreen({ navigation }) {
                   <TextInput
                     style={{ flex: 1, fontSize: 20, textAlign: 'center' }}
                     value={preco}
-                    onChangeText={handlePrecoChange}
+                    onChangeText={(text) => handlePrecoChange(text, setPreco)}
                     keyboardType="numeric"
                     placeholder="0,00"
                   />
@@ -311,7 +313,8 @@ export function RegistrosScreen({ navigation }) {
         const dados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setRegistros(dados);
       } catch (error) {
-        console.error('Erro ao buscar documentos:', error);
+        console.error('Erro ao buscar documentos:', error.message || error);
+        Alert.alert("Erro", `Falha ao buscar documentos. ERROR ID:  ${error.message || error}`);
       }
     };
     fetchData();
