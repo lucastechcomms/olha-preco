@@ -2,8 +2,81 @@
 // 🧩 Arquivo de componentes visuais reutilizáveis (pequenos ou modulares)
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { db } from './Utils'; // Importa acesso ao Firestore via Utils.js
+
+export function MiniCard({ item, onSelect, selecionado }) {
+  const [produto, setProduto] = useState(null);
+
+  useEffect(() => {
+    const fetchProduto = async () => {
+      try {
+        const doc = await db.collection('produtos').doc(item.codigo).get();
+        if (doc.exists) {
+          setProduto(doc.data());
+        }
+      } catch (error) {
+        console.error('Erro ao buscar produto no MiniCard:', error);
+      }
+    };
+
+    fetchProduto();
+  }, [item.codigo]);
+
+  return (
+    <TouchableOpacity
+      onPress={() => onSelect(item)}
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 8,
+        marginVertical: 4,
+        marginHorizontal: 4,
+        backgroundColor: selecionado ? '#cce5ff' : '#fff',
+        borderColor: '#007bff',
+        borderWidth: 1,
+        borderRadius: 8,
+        width: '95%'
+      }}
+    >
+      {/* Esquerda: Nome e marca */}
+      <View style={{ flex: 1, marginRight: 8 }}>
+        <Text
+          style={{ fontWeight: 'bold', fontSize: 14 }}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {produto?.nome || 'Nome não disponível'}
+        </Text>
+        <Text
+          style={{ fontSize: 12, color: '#555' }}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {produto?.marca || ''}
+        </Text>
+      </View>
+
+      {/* Direita: Preço */}
+      <View style={{ minWidth: 80, alignItems: 'flex-end' }}>
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: 'bold',
+            color: '#007bff',
+            textAlign: 'right',
+            flexWrap: 'nowrap'
+          }}
+        >
+          R$ {item.preco?.toFixed(2)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+
 
 // 🔁 Componente: RegistroItem
 // Usado na tela de histórico para exibir cada leitura de preço com detalhes
@@ -60,6 +133,7 @@ export function RegistroItem({ item }) {
     </View>
   );
 }
+
 
 // 🎨 Estilos internos do componente (não vai para Styles.js pois são específicos)
 const styles = StyleSheet.create({
