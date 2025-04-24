@@ -5,6 +5,8 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 
 // Importação das telas centralizadas
 import {
@@ -18,7 +20,7 @@ const Stack = createStackNavigator();
 
 export default function App() {
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaProvider style={{ flex: 1 }}>
       <NavigationContainer>
         <Stack.Navigator initialRouteName="Home">
           <Stack.Screen name="Home" component={HomeScreen} />
@@ -27,6 +29,6 @@ export default function App() {
           <Stack.Screen name="Cadastrar Produto" component={CadastroProdutoScreen} />
         </Stack.Navigator>
       </NavigationContainer>
-    </SafeAreaView>
+    </SafeAreaProvider>
   );
 }

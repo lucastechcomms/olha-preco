@@ -15,6 +15,12 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RegistroItem, MiniCard } from './Components';
+import { Vibration } from 'react-native';
+import { Audio } from 'expo-av';
+import sucesso from './assets/sucesso.mp3';
+
+
+
 
 
 
@@ -42,9 +48,7 @@ import {
 export function HomeScreen({ navigation }) {
   const [mercadoProximo, setMercadoProximo] = useState(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -108,13 +112,14 @@ export function BarcodeScannerScreen({ navigation }) {
   const [preco, setPreco] = useState("");
   const [leiturasHoje, setLeiturasHoje] = useState([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
+  const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
+  const [feedbackVisual, setFeedbackVisual] = useState(false);
+
 
   const [mercadoProximo, setMercadoProximo] = useState(null);
 
   // Busca mercado ao abrir a tela
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -122,7 +127,19 @@ export function BarcodeScannerScreen({ navigation }) {
         return;
       }
 
-      let location = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync();
+      let location =
+        (await Location.getLastKnownPositionAsync()) ||
+        (await Location.getCurrentPositionAsync());
+
+      if (!location) {
+        Alert.alert(
+          "Erro ao obter localização",
+          "Não foi possível acessar a localização atual. Verifique se o GPS está ativado."
+        );
+        setScanned(false);
+        return;
+      }
+
       const { latitude, longitude } = location.coords;
 
       const snapshot = await db.collection('mercados').get();
@@ -177,11 +194,14 @@ export function BarcodeScannerScreen({ navigation }) {
           mercado: mercadoProximo?.nome
         });
 
-        await carregarLeiturasDoDia();
+        // Atualiza a lista de leituras
+        setPrecisaAtualizar(true);
 
+        // Limpa estado
         setProdutoModal(null);
         setPreco("");
         setScanned(false);
+
       } catch (error) {
         console.error('Erro ao salvar leitura:', error.message || error);
         Alert.alert("Erro", `Falha ao salvar leitura. ERROR ID: ${error.message || error}`);
@@ -193,6 +213,20 @@ export function BarcodeScannerScreen({ navigation }) {
 
     const handleBarCodeScanned = async ({ data }) => {
       setScanned(true);
+
+      // ✅ Feedback sensorial imediato
+      Vibration.vibrate(100); // vibra por 100ms
+      setFeedbackVisual(true); // ativa a borda verde (caso esteja implementando)
+      setTimeout(() => setFeedbackVisual(false), 300); // desativa após 300ms
+
+      
+      try {
+        const soundObject = new Audio.Sound();
+        await soundObject.loadAsync(sucesso);
+        await soundObject.playAsync();
+      } catch (error) {
+        console.error("Erro ao reproduzir som:", error);
+      }
 
       try {
         const docRef = db.collection("produtos").doc(data);
@@ -239,6 +273,13 @@ export function BarcodeScannerScreen({ navigation }) {
             mercado: mercadoProximo.nome,
             confirmado: false,
           });
+          console.log("✅ Leitura salva no Firebase:", {
+            codigo: produto.codigo,
+            preco: parseFloat(preco.replace(",", ".")),
+            mercado: mercadoProximo?.nome,
+            timestamp: new Date()
+          });
+
 
         } else {
           Alert.alert(
@@ -263,7 +304,6 @@ export function BarcodeScannerScreen({ navigation }) {
 
       
       // Fora do useEffect, mas DENTRO do BarcodeScannerScreen
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       const carregarLeiturasDoDia = async () => {
         if (!mercadoProximo?.nome) return;
 
@@ -281,24 +321,30 @@ export function BarcodeScannerScreen({ navigation }) {
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .filter(doc => doc.preco);
 
+          console.log("📦 Leituras carregadas:", resultados);
           setLeiturasHoje(resultados);
         } catch (error) {
           console.error("Erro ao buscar leituras do dia:", error);
         }
       };
 
+      /* eslint-disable react-hooks/exhaustive-deps */
+      useEffect(() => {
+        if (precisaAtualizar) {
+          carregarLeiturasDoDia();
+          setPrecisaAtualizar(false); // reseta o gatilho
+        }
+      }, [precisaAtualizar, mercadoProximo?.nome]);
+
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      useEffect(() => {
+        if (mercadoProximo?.nome) {
+          carregarLeiturasDoDia();
+        }
+      }, [mercadoProximo?.nome]);
 
 
 
-  //useEffect para filtrar leituras do dia
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-
-  if (mercadoProximo?.nome) {
-    carregarLeiturasDoDia();
-  }
-}, [mercadoProximo]);
 
   //UseEffect para atualização de estado da câmera
   /*useEffect(() => {
@@ -326,92 +372,100 @@ export function BarcodeScannerScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
       {/* 1️⃣ Câmera reduzida */}
-      <View style={{ height: screenHeight / 3, width: '100%' }}> //30% 1/3
-        <CameraView
-          style={{ flex: 1 }}
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
-        >
-          {/* Overlay */}
-          <View style={styles.layerContainer}>
-            <View style={styles.layerTop} />
-            <View style={styles.layerCenter}>
-              <View style={styles.layerLeft} />
-              <View style={styles.layerFocused} />
-              <View style={styles.layerRight} />
-            </View>
-            <View style={styles.layerBottom} />
+      <View
+        style={{
+          flex: 1,
+          borderWidth: 4,
+          borderColor: feedbackVisual ? 'limegreen' : 'transparent',
+          borderRadius: 12,
+          overflow: 'hidden',
+        }}
+      >
+      <CameraView
+        style={{ flex: 1 }}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+      >
+        {/* Overlay */}
+        <View style={styles.layerContainer}>
+          <View style={styles.layerTop} />
+          <View style={styles.layerCenter}>
+            <View style={styles.layerLeft} />
+            <View style={styles.layerFocused} />
+            <View style={styles.layerRight} />
           </View>
-        </CameraView>
-      </View>
+          <View style={styles.layerBottom} />
+        </View>
+      </CameraView>
+    </View>
 
-      {/* 2️⃣ Modal para confirmar preço no topo de tudo */}
-      {produtoModal && (
+    {/* 2️⃣ Modal para confirmar preço no topo de tudo */}
+    {produtoModal && (
+      <View style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center',
+        alignItems: 'center', zIndex: 10
+      }}>
         <View style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center',
-          alignItems: 'center', zIndex: 10
+          backgroundColor: 'white', padding: 20, borderRadius: 10,
+          width: '80%', alignItems: 'center'
         }}>
-          <View style={{
-            backgroundColor: 'white', padding: 20, borderRadius: 10,
-            width: '80%', alignItems: 'center'
-          }}>
-            <View style={{ width: '100%', alignItems: 'flex-start' }}>
-              <Text style={{ fontSize: 12, color: '#555', marginBottom: 5 }}>
-                📍 {mercadoProximo?.nome || 'Mercado desconhecido'}
-              </Text>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 2 }}>
-                {produtoModal?.nome} ({produtoModal?.quantidade}{produtoModal?.unidade})
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
-                {produtoModal?.marca}
-              </Text>
-              <Text style={{ fontSize: 14, color: '#444', marginBottom: 15 }}>
-                {produtoModal?.descricao}
-              </Text>
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', width: '100%',
-                borderColor: '#ccc', borderWidth: 1, borderRadius: 8,
-                paddingHorizontal: 10, paddingVertical: 8, marginBottom: 15
-              }}>
-                <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#000', marginRight: 8 }}>R$</Text>
-                <TextInput
-                  style={{ flex: 1, fontSize: 20, textAlign: 'center' }}
-                  value={preco}
-                  onChangeText={(text) => handlePrecoChange(text, setPreco)}
-                  keyboardType="numeric"
-                  placeholder="0,00"
-                />
-              </View>
+          <View style={{ width: '100%', alignItems: 'flex-start' }}>
+            <Text style={{ fontSize: 12, color: '#555', marginBottom: 5 }}>
+              📍 {mercadoProximo?.nome || 'Mercado desconhecido'}
+            </Text>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 2 }}>
+              {produtoModal?.nome} ({produtoModal?.quantidade}{produtoModal?.unidade})
+            </Text>
+            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+              {produtoModal?.marca}
+            </Text>
+            <Text style={{ fontSize: 14, color: '#444', marginBottom: 15 }}>
+              {produtoModal?.descricao}
+            </Text>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', width: '100%',
+              borderColor: '#ccc', borderWidth: 1, borderRadius: 8,
+              paddingHorizontal: 10, paddingVertical: 8, marginBottom: 15
+            }}>
+              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#000', marginRight: 8 }}>R$</Text>
+              <TextInput
+                style={{ flex: 1, fontSize: 20, textAlign: 'center' }}
+                value={preco}
+                onChangeText={(text) => handlePrecoChange(text, setPreco)}
+                keyboardType="numeric"
+                placeholder="0,00"
+              />
             </View>
+          </View>
 
-            {/* Botões */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-              <TouchableOpacity
-                onPress={() => { setProdutoModal(null); setPreco(""); setScanned(false); }}
-                style={{ backgroundColor: '#dc3545', padding: 10, borderRadius: 8, flex: 1, marginRight: 5 }}
-              >
-                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={salvando || !produtoModal || !produtoModal.codigo}
-                onPress={confirmarLeitura}
-                style={{
-                  backgroundColor: (salvando || !produtoModal) ? '#aaa' : '#28a745',
-                  padding: 10,
-                  borderRadius: 8,
-                  flex: 1,
-                  marginLeft: 5
-                }}
-              >
-                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>
-                  {salvando ? 'Salvando...' : 'Confirmar'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {/* Botões */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+            <TouchableOpacity
+              onPress={() => { setProdutoModal(null); setPreco(""); setScanned(false); }}
+              style={{ backgroundColor: '#dc3545', padding: 10, borderRadius: 8, flex: 1, marginRight: 5 }}
+            >
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              disabled={salvando || !produtoModal || !produtoModal.codigo}
+              onPress={confirmarLeitura}
+              style={{
+                backgroundColor: (salvando || !produtoModal) ? '#aaa' : '#28a745',
+                padding: 10,
+                borderRadius: 8,
+                flex: 1,
+                marginLeft: 5
+              }}
+            >
+              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>
+                {salvando ? 'Salvando...' : 'Confirmar'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
+      </View>
+    )}
 
       {/* 3️⃣ informações */}
       <View style={{ flex: 2, flexDirection: 'row' }}>
@@ -421,6 +475,13 @@ export function BarcodeScannerScreen({ navigation }) {
               <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>
                 📦 Lidos Hoje
               </Text>
+
+              {/* 🟡 Adiciona essa verificação aqui */}
+              {leiturasHoje.length === 0 && (
+                <Text style={{ color: '#888', textAlign: 'center', marginBottom: 10 }}>
+                  Nenhuma leitura registrada hoje
+                </Text>
+              )}
 
               <FlatList
                 data={leiturasHoje}
@@ -468,9 +529,7 @@ export function BarcodeScannerScreen({ navigation }) {
             </Text>
           )}
         </View>
-
       </View>
-
     </View>
   );
 }
@@ -482,9 +541,7 @@ export function RegistrosScreen({ navigation }) {
   const [registros, setRegistros] = useState([]);
   const [filtro, setFiltro] = useState("");
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const fetchData = async () => {
       try {
         const snapshot = await db.collection('leituras').orderBy('timestamp', 'desc').limit(20).get();
