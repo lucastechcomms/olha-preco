@@ -100,3 +100,14 @@ export function handlePrecoChange(text, setFunction) {
   const valor = (parseFloat(numeric) / 100).toFixed(2);
   setFunction(valor.replace(".", ","));
 }
+
+// ==============================
+// Exibição de informação
+// ==============================
+
+export function calcularResumoCarrinho(leituras) {
+  const total = leituras.reduce((soma, item) => soma + (item.preco || 0), 0);
+  const quantidade = leituras.length;
+  return { total, quantidade };
+}
+

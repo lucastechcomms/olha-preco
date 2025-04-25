@@ -18,6 +18,7 @@ import { RegistroItem, MiniCard } from './Components';
 import { Vibration } from 'react-native';
 import { Audio } from 'expo-av';
 import sucesso from './assets/sucesso.mp3';
+import { calcularResumoCarrinho } from './Utils';
 
 
 
@@ -85,7 +86,7 @@ export function HomeScreen({ navigation }) {
       {mercadoProximo && (
         <View style={{ padding: 10, backgroundColor: '#eee', borderRadius: 8, marginBottom: 10 }}>
           <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-            📍 {mercadoProximo.nome} ({mercadoProximo.distanciaMetros}m)
+            📍 {mercadoProximo?.nome || 'Mercado desconhecido'}{mercadoProximo?.distanciaMetros ? ` (${mercadoProximo.distanciaMetros}m)` : ''}
           </Text>
         </View>
       )}
@@ -114,9 +115,11 @@ export function BarcodeScannerScreen({ navigation }) {
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
   const [feedbackVisual, setFeedbackVisual] = useState(false);
-
-
+  const [totalCarrinho, setTotalCarrinho] = useState(0);
+  const [quantidadeCarrinho, setQuantidadeCarrinho] = useState(0);
   const [mercadoProximo, setMercadoProximo] = useState(null);
+  const [variacaoCarrinho, setVariacaoCarrinho] = useState(0);
+
 
   // Busca mercado ao abrir a tela
   useEffect(() => {
@@ -162,6 +165,18 @@ export function BarcodeScannerScreen({ navigation }) {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (leiturasHoje.length > 0) {
+      const { total, quantidade } = calcularResumoCarrinho(leiturasHoje);
+      setTotalCarrinho(total);
+      setQuantidadeCarrinho(quantidade);
+    } else {
+      setTotalCarrinho(0);
+      setQuantidadeCarrinho(0);
+    }
+  }, [leiturasHoje]);
+
 
 
   const [salvando, setSalvando] = useState(false);
@@ -472,11 +487,15 @@ export function BarcodeScannerScreen({ navigation }) {
           {/* Parte esquerda: Produtos lidos hoje */}
           <View style={{ flex: 1, padding: 8 }}>
             <View style={{ height: usableHeight / 3 }}>
-              <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>
-                📦 Lidos Hoje
+              <Text style={{
+                fontSize: 18,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                marginBottom: 6
+              }}>
+                Carrinho
               </Text>
 
-              {/* 🟡 Adiciona essa verificação aqui */}
               {leiturasHoje.length === 0 && (
                 <Text style={{ color: '#888', textAlign: 'center', marginBottom: 10 }}>
                   Nenhuma leitura registrada hoje
@@ -489,7 +508,13 @@ export function BarcodeScannerScreen({ navigation }) {
                 renderItem={({ item }) => (
                   <MiniCard
                     item={item}
-                    onSelect={setProdutoSelecionado}
+                    onSelect={(itemSelecionado) => {
+                      if (produtoSelecionado?.id === itemSelecionado.id) {
+                        setProdutoSelecionado(null); // desmarca se já estiver selecionado
+                      } else {
+                        setProdutoSelecionado(itemSelecionado); // marca novo
+                      }
+                    }}
                     selecionado={produtoSelecionado?.id === item.id}
                   />
                 )}
@@ -501,33 +526,62 @@ export function BarcodeScannerScreen({ navigation }) {
 
 
         {/* Parte direita: mercado + detalhes */} 
-        <View style={{ flex: 1, padding: 8 }}>
-          {/* Exibe o mercado atual no topo direito */}
-          {mercadoProximo && (
-            <View style={{
-              padding: 10,
-              backgroundColor: '#eee',
-              borderRadius: 8,
-              marginBottom: 10
-            }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-                📍 {mercadoProximo.nome} ({mercadoProximo.distanciaMetros}m)
+        <View style={{ height: screenHeight / 3, padding: 8 }}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: '#f8f9fa',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#ccc',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 10,
+              paddingHorizontal: 12,
+            }}
+          >
+            {/* Nome do mercado */}
+            <Text
+              style={{
+                fontSize: 12,
+                color: '#555',
+                marginBottom: 8,
+                textAlign: 'center',
+                lineHeight: 16
+              }}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              📍 {mercadoProximo?.nome || 'Localizando...'}{mercadoProximo?.distanciaMetros ? ` (${mercadoProximo.distanciaMetros}m)` : ''}
+            </Text>
+
+
+            {/* Pares: Itens / Total / Economia */}
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>itens</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#000' }}>{quantidadeCarrinho}</Text>
+            </View>
+
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>total</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#000' }}>
+                R$ {totalCarrinho.toFixed(2)}
               </Text>
             </View>
-          )}
 
-          {/* Placeholder ou detalhes do produto */}
-          {produtoSelecionado ? (
-            <View>
-              <Text style={{ fontWeight: 'bold' }}>📦 Produto:</Text>
-              <Text>Código: {produtoSelecionado.codigo}</Text>
-              <Text>Preço: R$ {produtoSelecionado.preco.toFixed(2)}</Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, color: '#888' }}>economia</Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: variacaoCarrinho >= 0 ? 'green' : 'red'
+                }}
+              >
+                {variacaoCarrinho >= 0 ? '+' : '-'}R$ {Math.abs(variacaoCarrinho).toFixed(2)}
+              </Text>
             </View>
-          ) : (
-            <Text style={{ fontSize: 14, color: '#aaa' }}>
-              📊 Detalhes do produto selecionado virão aqui...
-            </Text>
-          )}
+          </View>
         </View>
       </View>
     </View>
