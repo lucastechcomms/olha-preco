@@ -482,50 +482,50 @@ export function BarcodeScannerScreen({ navigation }) {
       </View>
     )}
 
-      {/* 3️⃣ informações */}
-      <View style={{ flex: 2, flexDirection: 'row' }}>
-          {/* Parte esquerda: Produtos lidos hoje */}
-          <View style={{ flex: 1, padding: 8 }}>
-            <View style={{ height: usableHeight / 3 }}>
-              <Text style={{
-                fontSize: 18,
-                fontWeight: 'bold',
-                textAlign: 'center',
-                marginBottom: 6
-              }}>
-                Carrinho
+
+    {/* 3️⃣ Segundo terço: Carrinho e Consolidado */}
+    <View style={{ flex: 2, flexDirection: 'row' }}>
+        {/* Parte esquerda - carrinho */}
+        <View style={{ flex: 1, padding: 8 }}>
+          <View style={{ height: usableHeight / 3 }}>
+            <Text style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginBottom: 6
+            }}>
+              Carrinho
+            </Text>
+
+            {leiturasHoje.length === 0 && (
+              <Text style={{ color: '#888', textAlign: 'center', marginBottom: 10 }}>
+                Nenhuma leitura registrada hoje
               </Text>
+            )}
 
-              {leiturasHoje.length === 0 && (
-                <Text style={{ color: '#888', textAlign: 'center', marginBottom: 10 }}>
-                  Nenhuma leitura registrada hoje
-                </Text>
+            <FlatList
+              data={leiturasHoje}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <MiniCard
+                  item={item}
+                  onSelect={(itemSelecionado) => {
+                    if (produtoSelecionado?.id === itemSelecionado.id) {
+                      setProdutoSelecionado(null); // desmarca se já estiver selecionado
+                    } else {
+                      setProdutoSelecionado(itemSelecionado); // marca novo
+                    }
+                  }}
+                  selecionado={produtoSelecionado?.id === item.id}
+                />
               )}
-
-              <FlatList
-                data={leiturasHoje}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <MiniCard
-                    item={item}
-                    onSelect={(itemSelecionado) => {
-                      if (produtoSelecionado?.id === itemSelecionado.id) {
-                        setProdutoSelecionado(null); // desmarca se já estiver selecionado
-                      } else {
-                        setProdutoSelecionado(itemSelecionado); // marca novo
-                      }
-                    }}
-                    selecionado={produtoSelecionado?.id === item.id}
-                  />
-                )}
-                showsVerticalScrollIndicator={true}
-              />
-            </View>
+              showsVerticalScrollIndicator={true}
+            />
           </View>
+        </View>
 
 
-
-        {/* Parte direita: mercado + detalhes */} 
+        {/* Parte direita - consolidado */}
         <View style={{ height: screenHeight / 3, padding: 8 }}>
           <View
             style={{
@@ -584,8 +584,59 @@ export function BarcodeScannerScreen({ navigation }) {
           </View>
         </View>
       </View>
+
+      // 4️⃣ Terço inferior: Gráfico e lista (ou fallback)
+      <View style={{
+        flex: 1,
+        backgroundColor: produtoSelecionado ? '#cce5ff' : '#e0e0e0',
+        padding: 10,
+        borderTopWidth: 1,
+        borderColor: '#ccc',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        {produtoSelecionado ? (
+          <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
+            
+            {/* 📈 Gráfico */}
+            <View style={{
+              flex: 1,
+              backgroundColor: '#fff',
+              marginRight: 5,
+              borderRadius: 8,
+              padding: 10,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>📈 Histórico</Text>
+              <Text style={{ fontSize: 12 }}>{produtoSelecionado.codigo}</Text>
+            </View>
+
+            {/* 🏪 Mercados próximos */}
+            <View style={{
+              flex: 1,
+              backgroundColor: '#fff',
+              marginLeft: 5,
+              borderRadius: 8,
+              padding: 10,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>🏪 Outros mercados</Text>
+              <Text style={{ fontSize: 12 }}>{produtoSelecionado.codigo}</Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={{ fontSize: 14, color: '#555', textAlign: 'center', paddingHorizontal: 20 }}>
+            Estamos de olho no histórico... selecione um produto para investigar 👀
+          </Text>
+        )}
+      </View>
     </View>
+
+
   );
+  
 }
 
 // =========================
