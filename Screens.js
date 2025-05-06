@@ -19,10 +19,7 @@ import { Vibration } from 'react-native';
 import { Audio } from 'expo-av';
 import sucesso from './assets/sucesso.mp3';
 import { calcularResumoCarrinho } from './Utils';
-
-
-
-
+import { haversineDistance } from './Utils'; // função de distância já presente no seu projeto
 
 
 
@@ -587,7 +584,7 @@ export function BarcodeScannerScreen({ navigation }) {
 
       // 4️⃣ Terço inferior: Gráfico e lista (ou fallback)
       <View style={{
-        flex: 1,
+        flex: 2,
         backgroundColor: produtoSelecionado ? '#cce5ff' : '#e0e0e0',
         padding: 10,
         borderTopWidth: 1,
@@ -598,32 +595,36 @@ export function BarcodeScannerScreen({ navigation }) {
         {produtoSelecionado ? (
           <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
             
-            {/* 📈 Gráfico */}
+            {/* 📈 Linha do tempo */}
             <View style={{
-              flex: 1,
-              backgroundColor: '#fff',
-              marginRight: 5,
-              borderRadius: 8,
-              padding: 10,
+              width: '48%',
+              height: '120%',
+              backgroundColor: '#e0e0e0',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#999',
+              justifyContent: 'center',
               alignItems: 'center',
-              justifyContent: 'center'
+              padding: 10,
             }}>
-              <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>📈 Histórico</Text>
-              <Text style={{ fontSize: 12 }}>{produtoSelecionado.codigo}</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Linha do tempo</Text>
+              <Text style={{ fontSize: 12 }}>{produtoSelecionado?.codigo ?? ''}</Text>
             </View>
 
-            {/* 🏪 Mercados próximos */}
+            {/* 🏪 Outros Mercados */}
             <View style={{
-              flex: 1,
-              backgroundColor: '#fff',
-              marginLeft: 5,
-              borderRadius: 8,
-              padding: 10,
+              width: '48%',
+              height: '120%',
+              backgroundColor: '#e0e0e0',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#999',
+              justifyContent: 'center',
               alignItems: 'center',
-              justifyContent: 'center'
+              padding: 10,
             }}>
-              <Text style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 4 }}>🏪 Outros mercados</Text>
-              <Text style={{ fontSize: 12 }}>{produtoSelecionado.codigo}</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Outros Mercados</Text>
+              <Text style={{ fontSize: 12 }}>{produtoSelecionado?.codigo ?? ''}</Text>
             </View>
           </View>
         ) : (
@@ -632,8 +633,8 @@ export function BarcodeScannerScreen({ navigation }) {
           </Text>
         )}
       </View>
-    </View>
 
+    </View>
 
   );
   
