@@ -4,8 +4,20 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { db } from './Utils'; // Importa acesso ao Firestore via Utils.js
+import {
+  calcularDistancia,
+  formatarDistancia,
+  corDoPrecoComparado,
+} from './Utils';
 
-export function MiniCard({ item, onSelect, selecionado }) {
+export function MiniCard({
+  item,
+  onSelect,
+  selecionado,
+  exibirMercado = false,
+  localizacaoUsuario = null,
+  precoComparativo = null, // ✅ ADICIONE ESTA LINHA
+}) {
   const [produto, setProduto] = useState(null);
 
   useEffect(() => {
@@ -23,6 +35,21 @@ export function MiniCard({ item, onSelect, selecionado }) {
     fetchProduto();
   }, [item.codigo]);
 
+  //Calcular distância se for para exibir mercado
+  const [distanciaMetros, setDistanciaMetros] = useState(null);
+
+  useEffect(() => {
+    if (exibirMercado && localizacaoUsuario && item.geopoint) {
+      const lat1 = localizacaoUsuario.latitude;
+      const lon1 = localizacaoUsuario.longitude;
+      const lat2 = item.geopoint.latitude;
+      const lon2 = item.geopoint.longitude;
+
+      const distanciaKm = calcularDistancia(lat1, lon1, lat2, lon2);
+      setDistanciaMetros(Math.round(distanciaKm * 1000));
+    }
+  }, [exibirMercado, localizacaoUsuario, item.geopoint]);
+
   return (
     <TouchableOpacity
       onPress={() => onSelect(item)}
@@ -37,24 +64,27 @@ export function MiniCard({ item, onSelect, selecionado }) {
         borderColor: '#007bff',
         borderWidth: 1,
         borderRadius: 8,
-        width: '95%'
-      }}
-    >
+        width: '95%',
+      }}>
       {/* Esquerda: Nome e marca */}
       <View style={{ flex: 1, marginRight: 8 }}>
         <Text
           style={{ fontWeight: 'bold', fontSize: 14 }}
           numberOfLines={2}
-          ellipsizeMode="tail"
-        >
-          {produto?.nome || 'Nome não disponível'}
+          ellipsizeMode="tail">
+          {exibirMercado
+            ? item.mercado
+            : produto?.nome || 'Nome não disponível'}
         </Text>
         <Text
           style={{ fontSize: 12, color: '#555' }}
           numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {produto?.marca || ''}
+          ellipsizeMode="tail">
+          {exibirMercado
+            ? distanciaMetros !== null
+              ? `${formatarDistancia(distanciaMetros)}`
+              : ''
+            : produto?.marca || ''}
         </Text>
       </View>
 
@@ -64,19 +94,19 @@ export function MiniCard({ item, onSelect, selecionado }) {
           style={{
             fontSize: 16,
             fontWeight: 'bold',
-            color: '#007bff',
+            color: precoComparativo !== null
+  ? corDoPrecoComparado(item.preco, precoComparativo)
+  : '#007bff',
+
             textAlign: 'right',
-            flexWrap: 'nowrap'
-          }}
-        >
+            flexWrap: 'nowrap',
+          }}>
           R$ {item.preco?.toFixed(2)}
         </Text>
       </View>
     </TouchableOpacity>
   );
 }
-
-
 
 // 🔁 Componente: RegistroItem
 // Usado na tela de histórico para exibir cada leitura de preço com detalhes
@@ -105,7 +135,9 @@ export function RegistroItem({ item }) {
     <View style={styles.card}>
       {/* Nome do mercado */}
       <View style={styles.header}>
-        <Text style={styles.mercado}>📍 {item.mercado || 'Mercado desconhecido'}</Text>
+        <Text style={styles.mercado}>
+          📍 {item.mercado || 'Mercado desconhecido'}
+        </Text>
       </View>
 
       {/* Detalhes do produto e preço */}
@@ -113,14 +145,18 @@ export function RegistroItem({ item }) {
         <View style={styles.info}>
           <Text style={styles.nome}>
             {produto?.nome || 'Produto'}
-            {produto?.quantidade ? ` (${produto.quantidade}${produto.unidade})` : ''}
+            {produto?.quantidade
+              ? ` (${produto.quantidade}${produto.unidade})`
+              : ''}
           </Text>
           <Text style={styles.marca}>{produto?.marca}</Text>
           <Text style={styles.descricao}>{produto?.descricao}</Text>
         </View>
         <View style={styles.precoContainer}>
           <Text style={styles.preco}>
-            {typeof item.preco === 'number' ? `R$ ${item.preco.toFixed(2)}` : '-'}
+            {typeof item.preco === 'number'
+              ? `R$ ${item.preco.toFixed(2)}`
+              : '-'}
           </Text>
         </View>
       </View>
@@ -133,7 +169,6 @@ export function RegistroItem({ item }) {
     </View>
   );
 }
-
 
 // 🎨 Estilos internos do componente (não vai para Styles.js pois são específicos)
 const styles = StyleSheet.create({

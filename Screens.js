@@ -3,8 +3,15 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, 
-  ScrollView, Alert, FlatList, Button, Dimensions
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  FlatList,
+  Button,
+  Dimensions,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -20,8 +27,6 @@ import { Audio } from 'expo-av';
 import sucesso from './assets/sucesso.mp3';
 import { calcularResumoCarrinho } from './Utils';
 import { haversineDistance } from './Utils'; // função de distância já presente no seu projeto
-
-
 
 // Estilos centralizados
 import { styles } from './Styles';
@@ -50,25 +55,31 @@ export function HomeScreen({ navigation }) {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Não foi possível acessar a localização.');
+        Alert.alert(
+          'Permissão negada',
+          'Não foi possível acessar a localização.'
+        );
         return;
       }
 
-      let location = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync();
+      let location =
+        (await Location.getLastKnownPositionAsync()) ||
+        (await Location.getCurrentPositionAsync());
       const { latitude, longitude } = location.coords;
 
       const snapshot = await db.collection('mercados').get();
-      const mercados = snapshot.docs.map(doc => ({
+      const mercados = snapshot.docs.map((doc) => ({
         id: doc.id,
         nome: doc.data().Nome,
-        coordenadas: doc.data().Coordenadas
+        coordenadas: doc.data().Coordenadas,
       }));
 
       const mercado = encontrarMercadoProximo(latitude, longitude, mercados);
 
       if (mercado) {
         const distanciaKm = calcularDistancia(
-          latitude, longitude,
+          latitude,
+          longitude,
           mercado.coordenadas.latitude,
           mercado.coordenadas.longitude
         );
@@ -81,18 +92,31 @@ export function HomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       {mercadoProximo && (
-        <View style={{ padding: 10, backgroundColor: '#eee', borderRadius: 8, marginBottom: 10 }}>
+        <View
+          style={{
+            padding: 10,
+            backgroundColor: '#eee',
+            borderRadius: 8,
+            marginBottom: 10,
+          }}>
           <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-            📍 {mercadoProximo?.nome || 'Mercado desconhecido'}{mercadoProximo?.distanciaMetros ? ` (${mercadoProximo.distanciaMetros}m)` : ''}
+            📍 {mercadoProximo?.nome || 'Mercado desconhecido'}
+            {mercadoProximo?.distanciaMetros
+              ? ` (${mercadoProximo.distanciaMetros}m)`
+              : ''}
           </Text>
         </View>
       )}
 
       <Text style={styles.title}>Controle de Preços</Text>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Leitura")}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('Leitura')}>
         <Text style={styles.buttonText}>Iniciar Leitura</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("Histórico")}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('Histórico')}>
         <Text style={styles.buttonText}>Histórico</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -107,7 +131,7 @@ export function BarcodeScannerScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [produtoModal, setProdutoModal] = useState(null);
-  const [preco, setPreco] = useState("");
+  const [preco, setPreco] = useState('');
   const [leiturasHoje, setLeiturasHoje] = useState([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
@@ -116,14 +140,45 @@ export function BarcodeScannerScreen({ navigation }) {
   const [quantidadeCarrinho, setQuantidadeCarrinho] = useState(0);
   const [mercadoProximo, setMercadoProximo] = useState(null);
   const [variacaoCarrinho, setVariacaoCarrinho] = useState(0);
+  const [leiturasOutros, setLeiturasOutros] = useState([]);
 
+  //executa a consulta no Firebase sempre que um novo produto for selecionado no carrinho
+  useEffect(() => {
+    const carregarLeiturasOutrosMercados = async () => {
+      if (!produtoSelecionado?.codigo) return;
+
+      try {
+        const snapshot = await db
+          .collection('leituras')
+          .where('codigo', '==', produtoSelecionado.codigo)
+          .orderBy('timestamp', 'desc')
+          .limit(25) // busca mais, já que vamos filtrar depois
+          .get();
+
+        const resultados = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((item) => typeof item.preco === 'number'); // só com preço válido
+
+        console.log('📊 Leituras encontradas:', resultados);
+
+        setLeiturasOutros(resultados.slice(0, 15)); // garante no máximo 15 após filtro
+      } catch (error) {
+        console.error('Erro ao buscar leituras de outros mercados:', error);
+      }
+    };
+
+    carregarLeiturasOutrosMercados();
+  }, [produtoSelecionado?.codigo]);
 
   // Busca mercado ao abrir a tela
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permissão negada', 'Não foi possível acessar a localização.');
+        Alert.alert(
+          'Permissão negada',
+          'Não foi possível acessar a localização.'
+        );
         return;
       }
 
@@ -133,8 +188,8 @@ export function BarcodeScannerScreen({ navigation }) {
 
       if (!location) {
         Alert.alert(
-          "Erro ao obter localização",
-          "Não foi possível acessar a localização atual. Verifique se o GPS está ativado."
+          'Erro ao obter localização',
+          'Não foi possível acessar a localização atual. Verifique se o GPS está ativado.'
         );
         setScanned(false);
         return;
@@ -143,17 +198,18 @@ export function BarcodeScannerScreen({ navigation }) {
       const { latitude, longitude } = location.coords;
 
       const snapshot = await db.collection('mercados').get();
-      const mercados = snapshot.docs.map(doc => ({
+      const mercados = snapshot.docs.map((doc) => ({
         id: doc.id,
         nome: doc.data().Nome,
-        coordenadas: doc.data().Coordenadas
+        coordenadas: doc.data().Coordenadas,
       }));
 
       const mercado = encontrarMercadoProximo(latitude, longitude, mercados);
 
       if (mercado) {
         const distanciaKm = calcularDistancia(
-          latitude, longitude,
+          latitude,
+          longitude,
           mercado.coordenadas.latitude,
           mercado.coordenadas.longitude
         );
@@ -174,189 +230,200 @@ export function BarcodeScannerScreen({ navigation }) {
     }
   }, [leiturasHoje]);
 
-
-
   const [salvando, setSalvando] = useState(false);
   const confirmarLeitura = async () => {
     const produto = produtoModal;
 
-      if (!produto || !produto.codigo) {
-        console.error("Produto inválido:", produto);
-        Alert.alert("Erro", "Produto não carregado corretamente.");
+    if (!produto || !produto.codigo) {
+      console.error('Produto inválido:', produto);
+      Alert.alert('Erro', 'Produto não carregado corretamente.');
+      return;
+    }
+
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão negada',
+          'Não foi possível acessar a localização.'
+        );
         return;
       }
 
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permissão negada', 'Não foi possível acessar a localização.');
-          return;
-        }
+      let location =
+        (await Location.getLastKnownPositionAsync()) ||
+        (await Location.getCurrentPositionAsync());
+      const { latitude, longitude } = location.coords;
 
-        let location = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync();
-        const { latitude, longitude } = location.coords;
+      const geopoint = new firebase.firestore.GeoPoint(latitude, longitude);
 
-        const geopoint = new firebase.firestore.GeoPoint(latitude, longitude);
+      await db.collection('leituras').add({
+        codigo: produto.codigo,
+        preco: parseFloat(preco.replace(',', '.')),
+        timestamp: firebaseTimestamp(),
+        geopoint: geopoint,
+        mercado: mercadoProximo?.nome,
+      });
 
-        await db.collection('leituras').add({
-          codigo: produto.codigo,
-          preco: parseFloat(preco.replace(",", ".")),
-          timestamp: firebaseTimestamp(),
-          geopoint: geopoint,
-          mercado: mercadoProximo?.nome
+      // Atualiza a lista de leituras
+      setPrecisaAtualizar(true);
+
+      // Limpa estado
+      setProdutoModal(null);
+      setPreco('');
+      setScanned(false);
+    } catch (error) {
+      console.error('Erro ao salvar leitura:', error.message || error);
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar leitura. ERROR ID: ${error.message || error}`
+      );
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleBarCodeScanned = async ({ data }) => {
+    setScanned(true);
+
+    // ✅ Feedback sensorial imediato
+    Vibration.vibrate(100); // vibra por 100ms
+    setFeedbackVisual(true); // ativa a borda verde (caso esteja implementando)
+    setTimeout(() => setFeedbackVisual(false), 300); // desativa após 300ms
+
+    try {
+      const soundObject = new Audio.Sound();
+      await soundObject.loadAsync(sucesso);
+      await soundObject.playAsync();
+    } catch (error) {
+      console.error('Erro ao reproduzir som:', error);
+    }
+
+    try {
+      const docRef = db.collection('produtos').doc(data);
+      const docSnap = await docRef.get();
+
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão negada',
+          'Não foi possível acessar a localização.'
+        );
+        setScanned(false);
+        return;
+      }
+
+      let location =
+        (await Location.getLastKnownPositionAsync()) ||
+        (await Location.getCurrentPositionAsync());
+      const geopoint = new firebase.firestore.GeoPoint(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+
+      if (docSnap.exists) {
+        const produto = docSnap.data();
+
+        // ✅ Preenche corretamente o produtoModal antes de salvar leitura
+        const produtoFinal = {
+          nome: produto.nome || 'Sem nome',
+          codigo: data,
+          marca: produto.marca || '',
+          descricao: produto.descricao || '',
+          quantidade: produto.quantidade || '',
+          unidade: produto.unidade || '',
+        };
+
+        setProdutoModal(produtoFinal);
+        setPreco('');
+
+        console.log('🧾 Leitura salva:', {
+          codigo: produtoFinal.codigo,
+          preco: parseFloat(preco.replace(',', '.')), // este ainda será ajustado no modal
+          timestamp: new Date(),
+          mercado: mercadoProximo?.nome,
         });
 
-        // Atualiza a lista de leituras
-        setPrecisaAtualizar(true);
-
-        // Limpa estado
-        setProdutoModal(null);
-        setPreco("");
-        setScanned(false);
-
-      } catch (error) {
-        console.error('Erro ao salvar leitura:', error.message || error);
-        Alert.alert("Erro", `Falha ao salvar leitura. ERROR ID: ${error.message || error}`);
-      } finally {
-        setSalvando(false);
-      }
-
-    };
-
-    const handleBarCodeScanned = async ({ data }) => {
-      setScanned(true);
-
-      // ✅ Feedback sensorial imediato
-      Vibration.vibrate(100); // vibra por 100ms
-      setFeedbackVisual(true); // ativa a borda verde (caso esteja implementando)
-      setTimeout(() => setFeedbackVisual(false), 300); // desativa após 300ms
-
-      
-      try {
-        const soundObject = new Audio.Sound();
-        await soundObject.loadAsync(sucesso);
-        await soundObject.playAsync();
-      } catch (error) {
-        console.error("Erro ao reproduzir som:", error);
-      }
-
-      try {
-        const docRef = db.collection("produtos").doc(data);
-        const docSnap = await docRef.get();
-
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permissão negada', 'Não foi possível acessar a localização.');
-          setScanned(false);
-          return;
-        }
-
-        let location = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync();
-        const geopoint = new firebase.firestore.GeoPoint(location.coords.latitude, location.coords.longitude);
-
-        if (docSnap.exists) {
-          const produto = docSnap.data();
-
-          // ✅ Preenche corretamente o produtoModal antes de salvar leitura
-          const produtoFinal = {
-            nome: produto.nome || 'Sem nome',
-            codigo: data,
-            marca: produto.marca || '',
-            descricao: produto.descricao || '',
-            quantidade: produto.quantidade || '',
-            unidade: produto.unidade || '',
-          };
-
-          setProdutoModal(produtoFinal);
-          setPreco("");
-
-          console.log("🧾 Leitura salva:", {
-            codigo: produtoFinal.codigo,
-            preco: parseFloat(preco.replace(",", ".")), // este ainda será ajustado no modal
-            timestamp: new Date(),
-            mercado: mercadoProximo?.nome
-          });
-
-          // ✅ Agora sim: salva a leitura básica (com confirmado: false)
-          await db.collection('leituras').add({
-            codigo: produtoFinal.codigo,
-            timestamp: firebaseTimestamp(),
-            geopoint: geopoint,
-            mercado: mercadoProximo.nome,
-            confirmado: false,
-          });
-          console.log("✅ Leitura salva no Firebase:", {
-            codigo: produto.codigo,
-            preco: parseFloat(preco.replace(",", ".")),
-            mercado: mercadoProximo?.nome,
-            timestamp: new Date()
-          });
-
-
-        } else {
-          Alert.alert(
-            "📦 Produto desconhecido",
-            "O produto não está cadastrado. Vamos registrá-lo agora.",
-            [{
+        // ✅ Agora sim: salva a leitura básica (com confirmado: false)
+        await db.collection('leituras').add({
+          codigo: produtoFinal.codigo,
+          timestamp: firebaseTimestamp(),
+          geopoint: geopoint,
+          mercado: mercadoProximo.nome,
+          confirmado: false,
+        });
+        console.log('✅ Leitura salva no Firebase:', {
+          codigo: produto.codigo,
+          preco: parseFloat(preco.replace(',', '.')),
+          mercado: mercadoProximo?.nome,
+          timestamp: new Date(),
+        });
+      } else {
+        Alert.alert(
+          '📦 Produto desconhecido',
+          'O produto não está cadastrado. Vamos registrá-lo agora.',
+          [
+            {
               text: 'OK',
               onPress: () => {
                 setScanned(false);
-                navigation.navigate("Cadastrar Produto", { codigo: data });
-              }
-            }],
-            { cancelable: false }
-          );
-        }
-      } catch (error) {
-        console.error('Erro ao salvar leitura:', error.message || error);
-        Alert.alert("Erro", `Falha ao salvar leitura. ERROR ID:  ${error.message || error}`);
-        setScanned(false);
+                navigation.navigate('Cadastrar Produto', { codigo: data });
+              },
+            },
+          ],
+          { cancelable: false }
+        );
       }
-    };
+    } catch (error) {
+      console.error('Erro ao salvar leitura:', error.message || error);
+      Alert.alert(
+        'Erro',
+        `Falha ao salvar leitura. ERROR ID:  ${error.message || error}`
+      );
+      setScanned(false);
+    }
+  };
 
-      
-      // Fora do useEffect, mas DENTRO do BarcodeScannerScreen
-      const carregarLeiturasDoDia = async () => {
-        if (!mercadoProximo?.nome) return;
+  // Fora do useEffect, mas DENTRO do BarcodeScannerScreen
+  const carregarLeiturasDoDia = async () => {
+    if (!mercadoProximo?.nome) return;
 
-        const hoje = new Date();
-        hoje.setHours(0, 0, 0, 0);
-        const timestampHoje = firebase.firestore.Timestamp.fromDate(hoje);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const timestampHoje = firebase.firestore.Timestamp.fromDate(hoje);
 
-        try {
-          const snapshot = await db.collection("leituras")
-            .where("timestamp", ">=", timestampHoje)
-            .where("mercado", "==", mercadoProximo.nome)
-            .get();
+    try {
+      const snapshot = await db
+        .collection('leituras')
+        .where('timestamp', '>=', timestampHoje)
+        .where('mercado', '==', mercadoProximo.nome)
+        .get();
 
-          const resultados = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(doc => doc.preco);
+      const resultados = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((doc) => doc.preco);
 
-          console.log("📦 Leituras carregadas:", resultados);
-          setLeiturasHoje(resultados);
-        } catch (error) {
-          console.error("Erro ao buscar leituras do dia:", error);
-        }
-      };
+      console.log('📦 Leituras carregadas:', resultados);
+      setLeiturasHoje(resultados);
+    } catch (error) {
+      console.error('Erro ao buscar leituras do dia:', error);
+    }
+  };
 
-      /* eslint-disable react-hooks/exhaustive-deps */
-      useEffect(() => {
-        if (precisaAtualizar) {
-          carregarLeiturasDoDia();
-          setPrecisaAtualizar(false); // reseta o gatilho
-        }
-      }, [precisaAtualizar, mercadoProximo?.nome]);
+  /* eslint-disable react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (precisaAtualizar) {
+      carregarLeiturasDoDia();
+      setPrecisaAtualizar(false); // reseta o gatilho
+    }
+  }, [precisaAtualizar, mercadoProximo?.nome]);
 
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      useEffect(() => {
-        if (mercadoProximo?.nome) {
-          carregarLeiturasDoDia();
-        }
-      }, [mercadoProximo?.nome]);
-
-
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (mercadoProximo?.nome) {
+      carregarLeiturasDoDia();
+    }
+  }, [mercadoProximo?.nome]);
 
   //UseEffect para atualização de estado da câmera
   /*useEffect(() => {
@@ -391,111 +458,169 @@ export function BarcodeScannerScreen({ navigation }) {
           borderColor: feedbackVisual ? 'limegreen' : 'transparent',
           borderRadius: 12,
           overflow: 'hidden',
-        }}
-      >
-      <CameraView
-        style={{ flex: 1 }}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
-      >
-        {/* Overlay */}
-        <View style={styles.layerContainer}>
-          <View style={styles.layerTop} />
-          <View style={styles.layerCenter}>
-            <View style={styles.layerLeft} />
-            <View style={styles.layerFocused} />
-            <View style={styles.layerRight} />
-          </View>
-          <View style={styles.layerBottom} />
-        </View>
-      </CameraView>
-    </View>
-
-    {/* 2️⃣ Modal para confirmar preço no topo de tudo */}
-    {produtoModal && (
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center',
-        alignItems: 'center', zIndex: 10
-      }}>
-        <View style={{
-          backgroundColor: 'white', padding: 20, borderRadius: 10,
-          width: '80%', alignItems: 'center'
         }}>
-          <View style={{ width: '100%', alignItems: 'flex-start' }}>
-            <Text style={{ fontSize: 12, color: '#555', marginBottom: 5 }}>
-              📍 {mercadoProximo?.nome || 'Mercado desconhecido'}
-            </Text>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 2 }}>
-              {produtoModal?.nome} ({produtoModal?.quantidade}{produtoModal?.unidade})
-            </Text>
-            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
-              {produtoModal?.marca}
-            </Text>
-            <Text style={{ fontSize: 14, color: '#444', marginBottom: 15 }}>
-              {produtoModal?.descricao}
-            </Text>
-            <View style={{
-              flexDirection: 'row', alignItems: 'center', width: '100%',
-              borderColor: '#ccc', borderWidth: 1, borderRadius: 8,
-              paddingHorizontal: 10, paddingVertical: 8, marginBottom: 15
+        <CameraView
+          style={{ flex: 1 }}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'],
+          }}>
+          {/* Overlay */}
+          <View style={styles.layerContainer}>
+            <View style={styles.layerTop} />
+            <View style={styles.layerCenter}>
+              <View style={styles.layerLeft} />
+              <View style={styles.layerFocused} />
+              <View style={styles.layerRight} />
+            </View>
+            <View style={styles.layerBottom} />
+          </View>
+        </CameraView>
+      </View>
+      {/* 2️⃣ Modal para confirmar preço no topo de tudo */}
+      {produtoModal && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 10,
+          }}>
+          <View
+            style={{
+              backgroundColor: 'white',
+              padding: 20,
+              borderRadius: 10,
+              width: '80%',
+              alignItems: 'center',
             }}>
-              <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#000', marginRight: 8 }}>R$</Text>
-              <TextInput
-                style={{ flex: 1, fontSize: 20, textAlign: 'center' }}
-                value={preco}
-                onChangeText={(text) => handlePrecoChange(text, setPreco)}
-                keyboardType="numeric"
-                placeholder="0,00"
-              />
+            <View style={{ width: '100%', alignItems: 'flex-start' }}>
+              <Text style={{ fontSize: 12, color: '#555', marginBottom: 5 }}>
+                📍 {mercadoProximo?.nome || 'Mercado desconhecido'}
+              </Text>
+              <Text
+                style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 2 }}>
+                {produtoModal?.nome} ({produtoModal?.quantidade}
+                {produtoModal?.unidade})
+              </Text>
+              <Text
+                style={{ fontSize: 16, fontWeight: '600', marginBottom: 4 }}>
+                {produtoModal?.marca}
+              </Text>
+              <Text style={{ fontSize: 14, color: '#444', marginBottom: 15 }}>
+                {produtoModal?.descricao}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  width: '100%',
+                  borderColor: '#ccc',
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 8,
+                  marginBottom: 15,
+                }}>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 'bold',
+                    color: '#000',
+                    marginRight: 8,
+                  }}>
+                  R$
+                </Text>
+                <TextInput
+                  style={{ flex: 1, fontSize: 20, textAlign: 'center' }}
+                  value={preco}
+                  onChangeText={(text) => handlePrecoChange(text, setPreco)}
+                  keyboardType="numeric"
+                  placeholder="0,00"
+                />
+              </View>
+            </View>
+
+            {/* Botões */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                width: '100%',
+              }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setProdutoModal(null);
+                  setPreco('');
+                  setScanned(false);
+                }}
+                style={{
+                  backgroundColor: '#dc3545',
+                  padding: 10,
+                  borderRadius: 8,
+                  flex: 1,
+                  marginRight: 5,
+                }}>
+                <Text
+                  style={{
+                    color: '#fff',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                  }}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={salvando || !produtoModal || !produtoModal.codigo}
+                onPress={confirmarLeitura}
+                style={{
+                  backgroundColor:
+                    salvando || !produtoModal ? '#aaa' : '#28a745',
+                  padding: 10,
+                  borderRadius: 8,
+                  flex: 1,
+                  marginLeft: 5,
+                }}>
+                <Text
+                  style={{
+                    color: '#fff',
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                  }}>
+                  {salvando ? 'Salvando...' : 'Confirmar'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-
-          {/* Botões */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-            <TouchableOpacity
-              onPress={() => { setProdutoModal(null); setPreco(""); setScanned(false); }}
-              style={{ backgroundColor: '#dc3545', padding: 10, borderRadius: 8, flex: 1, marginRight: 5 }}
-            >
-              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              disabled={salvando || !produtoModal || !produtoModal.codigo}
-              onPress={confirmarLeitura}
-              style={{
-                backgroundColor: (salvando || !produtoModal) ? '#aaa' : '#28a745',
-                padding: 10,
-                borderRadius: 8,
-                flex: 1,
-                marginLeft: 5
-              }}
-            >
-              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold' }}>
-                {salvando ? 'Salvando...' : 'Confirmar'}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
-      </View>
-    )}
-
-
-    {/* 3️⃣ Segundo terço: Carrinho e Consolidado */}
-    <View style={{ flex: 2, flexDirection: 'row' }}>
+      )}
+      {/* 3️⃣ Segundo terço: Carrinho e Consolidado */}
+      <View style={{ flex: 2, flexDirection: 'row' }}>
         {/* Parte esquerda - carrinho */}
         <View style={{ flex: 1, padding: 8 }}>
           <View style={{ height: usableHeight / 3 }}>
-            <Text style={{
-              fontSize: 18,
-              fontWeight: 'bold',
-              textAlign: 'center',
-              marginBottom: 6
-            }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                marginBottom: 6,
+              }}>
               Carrinho
             </Text>
 
             {leiturasHoje.length === 0 && (
-              <Text style={{ color: '#888', textAlign: 'center', marginBottom: 10 }}>
+              <Text
+                style={{
+                  color: '#888',
+                  textAlign: 'center',
+                  marginBottom: 10,
+                }}>
                 Nenhuma leitura registrada hoje
               </Text>
             )}
@@ -521,7 +646,6 @@ export function BarcodeScannerScreen({ navigation }) {
           </View>
         </View>
 
-
         {/* Parte direita - consolidado */}
         <View style={{ height: screenHeight / 3, padding: 8 }}>
           <View
@@ -535,8 +659,7 @@ export function BarcodeScannerScreen({ navigation }) {
               justifyContent: 'center',
               paddingVertical: 10,
               paddingHorizontal: 12,
-            }}
-          >
+            }}>
             {/* Nome do mercado */}
             <Text
               style={{
@@ -544,19 +667,22 @@ export function BarcodeScannerScreen({ navigation }) {
                 color: '#555',
                 marginBottom: 8,
                 textAlign: 'center',
-                lineHeight: 16
+                lineHeight: 16,
               }}
               numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              📍 {mercadoProximo?.nome || 'Localizando...'}{mercadoProximo?.distanciaMetros ? ` (${mercadoProximo.distanciaMetros}m)` : ''}
+              ellipsizeMode="tail">
+              📍 {mercadoProximo?.nome || 'Localizando...'}
+              {mercadoProximo?.distanciaMetros
+                ? ` (${mercadoProximo.distanciaMetros}m)`
+                : ''}
             </Text>
-
 
             {/* Pares: Itens / Total / Economia */}
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontSize: 10, color: '#888' }}>itens</Text>
-              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#000' }}>{quantidadeCarrinho}</Text>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#000' }}>
+                {quantidadeCarrinho}
+              </Text>
             </View>
 
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
@@ -572,72 +698,146 @@ export function BarcodeScannerScreen({ navigation }) {
                 style={{
                   fontSize: 20,
                   fontWeight: 'bold',
-                  color: variacaoCarrinho >= 0 ? 'green' : 'red'
-                }}
-              >
-                {variacaoCarrinho >= 0 ? '+' : '-'}R$ {Math.abs(variacaoCarrinho).toFixed(2)}
+                  color: variacaoCarrinho >= 0 ? 'green' : 'red',
+                }}>
+                {variacaoCarrinho >= 0 ? '+' : '-'}R${' '}
+                {Math.abs(variacaoCarrinho).toFixed(2)}
               </Text>
             </View>
           </View>
         </View>
       </View>
-
+      {/*
       // 4️⃣ Terço inferior: Gráfico e lista (ou fallback)
-      <View style={{
-        flex: 2,
-        backgroundColor: produtoSelecionado ? '#cce5ff' : '#e0e0e0',
-        padding: 10,
-        borderTopWidth: 1,
-        borderColor: '#ccc',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}>
+      */}
+      <View
+        style={{
+          flex: 2,
+          backgroundColor: produtoSelecionado ? '#cce5ff' : '#e0e0e0',
+          padding: 10,
+          borderTopWidth: 1,
+          borderColor: '#ccc',
+          justifyContent: 'flex-start',
+        }}>
         {produtoSelecionado ? (
-          <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between' }}>
-            
-            {/* 📈 Linha do tempo */}
-            <View style={{
-              width: '48%',
-              height: '120%',
-              backgroundColor: '#e0e0e0',
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#999',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 10,
-            }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Linha do tempo</Text>
-              <Text style={{ fontSize: 12 }}>{produtoSelecionado?.codigo ?? ''}</Text>
+          <>
+            {/* TÍTULOS no topo da área azul */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginBottom: 6,
+              }}>
+              <View style={{ width: '48%' }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    color: '#004080',
+                  }}>
+                  Linha do tempo
+                </Text>
+              </View>
+              <View style={{ width: '48%' }}>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    color: '#004080',
+                  }}>
+                  Outros Mercados
+                </Text>
+              </View>
             </View>
 
-            {/* 🏪 Outros Mercados */}
-            <View style={{
-              width: '48%',
-              height: '120%',
-              backgroundColor: '#e0e0e0',
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#999',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 10,
-            }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Outros Mercados</Text>
-              <Text style={{ fontSize: 12 }}>{produtoSelecionado?.codigo ?? ''}</Text>
+            {/* BLOCO VISUAL CINZA COM CONTEÚDO */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                flex: 1,
+              }}>
+              {/* 📈 Linha do tempo */}
+              <View
+                style={{
+                  width: '48%',
+                  backgroundColor: '#e0e0e0',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#999',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: 10,
+                }}>
+                {/* Conteúdo futuro do gráfico virá aqui */}
+                <Text style={{ fontSize: 12, color: '#666' }}>
+                  (Gráfico aqui)
+                </Text>
+              </View>
+
+              {/* 🏪 Outros Mercados */}
+              <View
+                style={{
+                  width: '48%',
+                  backgroundColor: '#e0e0e0',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#999',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: 10,
+                }}>
+                {/* Conteúdo futuro de mercados alternativos */}
+                {leiturasOutros.length === 0 ? (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: '#666',
+                      textAlign: 'center',
+                    }}>
+                    Nenhuma leitura encontrada
+                  </Text>
+                ) : (
+                  <FlatList
+                    data={leiturasOutros}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
+                      <MiniCard
+                        item={item}
+                        onSelect={() => {}}
+                        selecionado={false}
+                        exibirMercado={true}
+                        localizacaoUsuario={mercadoProximo?.coordenadas}
+                        precoComparativo={produtoSelecionado?.preco || 0} // ✅ AQUI ESTÁ O TRECHO
+                      />
+                    )}
+                    showsVerticalScrollIndicator={true}
+                    contentContainerStyle={{ paddingBottom: 8 }}
+                  />
+                )}
+              </View>
             </View>
-          </View>
+          </>
         ) : (
-          <Text style={{ fontSize: 14, color: '#555', textAlign: 'center', paddingHorizontal: 20 }}>
-            Estamos de olho no histórico... selecione um produto para investigar 👀
-          </Text>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#555',
+                textAlign: 'center',
+                paddingHorizontal: 20,
+              }}>
+              Estamos de olho no histórico... selecione um produto para
+              investigar 👀
+            </Text>
+          </View>
         )}
       </View>
-
     </View>
-
   );
-  
 }
 
 // =========================
@@ -645,23 +845,33 @@ export function BarcodeScannerScreen({ navigation }) {
 // =========================
 export function RegistrosScreen({ navigation }) {
   const [registros, setRegistros] = useState([]);
-  const [filtro, setFiltro] = useState("");
+  const [filtro, setFiltro] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const snapshot = await db.collection('leituras').orderBy('timestamp', 'desc').limit(20).get();
-        const dados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const snapshot = await db
+          .collection('leituras')
+          .orderBy('timestamp', 'desc')
+          .limit(20)
+          .get();
+        const dados = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setRegistros(dados);
       } catch (error) {
         console.error('Erro ao buscar documentos:', error.message || error);
-        Alert.alert("Erro", `Falha ao buscar documentos. ERROR ID:  ${error.message || error}`);
+        Alert.alert(
+          'Erro',
+          `Falha ao buscar documentos. ERROR ID:  ${error.message || error}`
+        );
       }
     };
     fetchData();
   }, []);
 
-  const registrosFiltrados = registros.filter(item =>
+  const registrosFiltrados = registros.filter((item) =>
     item.codigo?.toLowerCase().includes(filtro.toLowerCase())
   );
 
@@ -675,12 +885,18 @@ export function RegistrosScreen({ navigation }) {
         onChangeText={setFiltro}
       />
       <FlatList
-        contentContainerStyle={{ paddingBottom: 100, alignItems: 'center', width: '100%' }}
+        contentContainerStyle={{
+          paddingBottom: 100,
+          alignItems: 'center',
+          width: '100%',
+        }}
         data={registrosFiltrados}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <RegistroItem item={item} />}
       />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.goBack()}>
         <Text style={styles.buttonText}>Voltar</Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -691,38 +907,67 @@ export function RegistrosScreen({ navigation }) {
 // 📝 TELA: CADASTRO MANUAL
 // =========================
 export function CadastroProdutoScreen({ route, navigation }) {
-  const [codigo, setCodigo] = useState(route.params?.codigo || "");
-  const [nome, setNome] = useState("");
-  const [descricao, setDescricao] = useState("");
-  const [marca, setMarca] = useState("");
+  const [codigo, setCodigo] = useState(route.params?.codigo || '');
+  const [nome, setNome] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [marca, setMarca] = useState('');
   const [categoria, setCategoria] = useState(categorias[0]);
-  const [quantidade, setQuantidade] = useState("");
-  const [unidade, setUnidade] = useState(unidadesPorCategoria[categorias[0]][0]);
+  const [quantidade, setQuantidade] = useState('');
+  const [unidade, setUnidade] = useState(
+    unidadesPorCategoria[categorias[0]][0]
+  );
 
   const cadastrarProduto = async () => {
-    if (!codigo) return Alert.alert("Erro", "Código de barras é obrigatório.");
+    if (!codigo) return Alert.alert('Erro', 'Código de barras é obrigatório.');
 
     try {
-      await db.collection('produtos').doc(codigo).set({
-        nome, descricao, marca, categoria,
-        quantidade: Number(quantidade), unidade,
-        timestamp: firebaseTimestamp()
-      });
-      Alert.alert("Sucesso", "Produto cadastrado com sucesso!");
+      await db
+        .collection('produtos')
+        .doc(codigo)
+        .set({
+          nome,
+          descricao,
+          marca,
+          categoria,
+          quantidade: Number(quantidade),
+          unidade,
+          timestamp: firebaseTimestamp(),
+        });
+      Alert.alert('Sucesso', 'Produto cadastrado com sucesso!');
       navigation.goBack();
     } catch (err) {
       console.error(err);
-      Alert.alert("Erro", "Não foi possível cadastrar o produto.");
+      Alert.alert('Erro', 'Não foi possível cadastrar o produto.');
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Cadastro de Produto</Text>
-      <TextInput style={styles.input} placeholder="Código de Barras" value={codigo} onChangeText={setCodigo} />
-      <TextInput style={styles.input} placeholder="Nome" value={nome} onChangeText={setNome} />
-      <TextInput style={styles.input} placeholder="Descrição" value={descricao} onChangeText={setDescricao} />
-      <TextInput style={styles.input} placeholder="Marca" value={marca} onChangeText={setMarca} />
+      <TextInput
+        style={styles.input}
+        placeholder="Código de Barras"
+        value={codigo}
+        onChangeText={setCodigo}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Nome"
+        value={nome}
+        onChangeText={setNome}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Descrição"
+        value={descricao}
+        onChangeText={setDescricao}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Marca"
+        value={marca}
+        onChangeText={setMarca}
+      />
 
       <Text style={{ fontSize: 16, marginBottom: 4 }}>Categoria:</Text>
       <Picker
@@ -731,8 +976,7 @@ export function CadastroProdutoScreen({ route, navigation }) {
         onValueChange={(itemValue) => {
           setCategoria(itemValue);
           setUnidade(unidadesPorCategoria[itemValue][0]);
-        }}
-      >
+        }}>
         {categorias.map((cat) => (
           <Picker.Item label={cat} value={cat} key={cat} />
         ))}
@@ -742,8 +986,7 @@ export function CadastroProdutoScreen({ route, navigation }) {
       <Picker
         selectedValue={unidade}
         style={styles.input}
-        onValueChange={(itemValue) => setUnidade(itemValue)}
-      >
+        onValueChange={(itemValue) => setUnidade(itemValue)}>
         {unidadesPorCategoria[categoria].map((uni) => (
           <Picker.Item label={uni} value={uni} key={uni} />
         ))}

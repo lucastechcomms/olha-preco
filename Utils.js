@@ -111,3 +111,48 @@ export function calcularResumoCarrinho(leituras) {
   return { total, quantidade };
 }
 
+
+
+// ==============================
+// 📏 Formatação de distância
+// ==============================
+
+/**
+ * Formata a distância em metros com base em regras de exibição:
+ * - Até 1000m: arredonda para múltiplos de 10m (ex: 730m → 730m)
+ * - Acima de 1000m: converte para km com dois algarismos significativos (ex: 1.2km, 3.3km)
+ */
+export function formatarDistancia(distanciaMetros) {
+  if (distanciaMetros < 1000) {
+    // Arredonda para o múltiplo de 10 mais próximo
+    const arredondado = Math.round(distanciaMetros / 10) * 10;
+    return `${arredondado}m`;
+  } else {
+    // Converte para km e limita para 2 algarismos significativos
+    const km = distanciaMetros / 1000;
+
+    // Usa Intl.NumberFormat para controlar precisão e formato
+    const formatador = new Intl.NumberFormat('pt-BR', {
+      maximumSignificantDigits: 2,
+    });
+
+    return `${formatador.format(km)}km`;
+  }
+}
+
+
+
+// ==============================
+// 🎨 Cores por comparação de preço
+// ==============================
+
+/**
+ * Retorna a cor do texto com base na comparação de preços
+ * @param {number} precoOutroMercado - preço do mercado alternativo
+ * @param {number} precoCarrinho - preço do produto no carrinho
+ */
+export function corDoPrecoComparado(precoOutroMercado, precoCarrinho) {
+  if (precoOutroMercado > precoCarrinho) return 'red';     // mais caro
+  if (precoOutroMercado < precoCarrinho) return 'green';   // mais barato
+  return '#007bff'; // azul padrão (igual)
+}
