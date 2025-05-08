@@ -144,31 +144,64 @@ export function BarcodeScannerScreen({ navigation }) {
 
   //executa a consulta no Firebase sempre que um novo produto for selecionado no carrinho
   useEffect(() => {
-    const carregarLeiturasOutrosMercados = async () => {
-      if (!produtoSelecionado?.codigo) return;
+  const carregarLeiturasOutrosMercados = async () => {
+    if (!produtoSelecionado?.codigo || !mercadoProximo) return;
 
-      try {
-        const snapshot = await db
-          .collection('leituras')
-          .where('codigo', '==', produtoSelecionado.codigo)
-          .orderBy('timestamp', 'desc')
-          .limit(25) // busca mais, já que vamos filtrar depois
-          .get();
+    try {
+      const snapshot = await db
+        .collection('leituras')
+        .where('codigo', '==', produtoSelecionado.codigo)
+        .orderBy('timestamp', 'desc')
+        .limit(50) // buscamos várias para garantir que temos amostras recentes
+        .get();
 
-        const resultados = snapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((item) => typeof item.preco === 'number'); // só com preço válido
+      const leituras = snapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((item) => typeof item.preco === 'number' && item.mercado);
 
-        console.log('📊 Leituras encontradas:', resultados);
-
-        setLeiturasOutros(resultados.slice(0, 15)); // garante no máximo 15 após filtro
-      } catch (error) {
-        console.error('Erro ao buscar leituras de outros mercados:', error);
+      // Agrupa por mercado, pegando apenas a leitura mais recente de cada mercado
+      const ultimaLeituraPorMercado = {};
+      for (const leitura of leituras) {
+        if (!ultimaLeituraPorMercado[leitura.mercado]) {
+          ultimaLeituraPorMercado[leitura.mercado] = leitura;
+        }
       }
-    };
 
-    carregarLeiturasOutrosMercados();
-  }, [produtoSelecionado?.codigo]);
+      // Transforma em array e filtra
+      const leiturasFiltradas = Object.values(ultimaLeituraPorMercado)
+        .filter((leitura) => {
+          // Ignora o próprio mercado atual
+          if (leitura.mercado === mercadoProximo.nome) return false;
+
+          // Garante que tenha geopoint válido
+          if (!leitura.geopoint) return false;
+
+          // Calcula a distância até o mercado atual
+          const distanciaKm = calcularDistancia(
+            mercadoProximo.coordenadas.latitude,
+            mercadoProximo.coordenadas.longitude,
+            leitura.geopoint.latitude,
+            leitura.geopoint.longitude
+          );
+
+          leitura.distanciaKm = distanciaKm; // salva para usar na ordenação depois
+
+          return distanciaKm <= 20; // mantém apenas se for até 20km
+        });
+
+      // Ordena por distância crescente
+      leiturasFiltradas.sort((a, b) => a.distanciaKm - b.distanciaKm);
+
+      // Atualiza o estado com os resultados
+      setLeiturasOutros(leiturasFiltradas);
+    } catch (error) {
+      console.error('Erro ao buscar leituras de outros mercados:', error);
+    }
+  };
+
+  carregarLeiturasOutrosMercados();
+}, [produtoSelecionado?.codigo, mercadoProximo]);
+
 
   // Busca mercado ao abrir a tela
   useEffect(() => {
