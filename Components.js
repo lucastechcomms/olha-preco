@@ -89,17 +89,17 @@ export function MiniCard({
       </View>
 
       {/* Direita: Preço */}
-      <View style={{ minWidth: 80, alignItems: 'flex-end' }}>
+      <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
         <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
           style={{
             fontSize: 16,
             fontWeight: 'bold',
-            color: precoComparativo !== null
-  ? corDoPrecoComparado(item.preco, precoComparativo)
-  : '#007bff',
-
-            textAlign: 'right',
-            flexWrap: 'nowrap',
+            color:
+              precoComparativo !== null
+                ? corDoPrecoComparado(item.preco, precoComparativo) // 🟢🔴🔵 quando for outro mercado
+                : '#007bff', // 🔵 sempre azul para o carrinho            textAlign: 'right',
           }}>
           R$ {item.preco?.toFixed(2)}
         </Text>
