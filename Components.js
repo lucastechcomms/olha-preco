@@ -8,6 +8,7 @@ import {
   calcularDistancia,
   formatarDistancia,
   corDoPrecoComparado,
+  exibirData,
 } from './Utils';
 
 export function MiniCard({
@@ -16,9 +17,24 @@ export function MiniCard({
   selecionado,
   exibirMercado = false,
   localizacaoUsuario = null,
-  precoComparativo = null, // ✅ ADICIONE ESTA LINHA
+  precoComparativo = null, // ✅ Recebe média para comparação
 }) {
   const [produto, setProduto] = useState(null);
+
+  // ✅ Função local para exibir a data de forma amigável
+  const exibirData = (timestamp) => {
+    if (!timestamp) return 'Data não disponível';
+    try {
+      return timestamp.toDate().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (e) {
+      return 'Formato inválido';
+    }
+  };
 
   useEffect(() => {
     const fetchProduto = async () => {
@@ -35,7 +51,7 @@ export function MiniCard({
     fetchProduto();
   }, [item.codigo]);
 
-  //Calcular distância se for para exibir mercado
+  // ✅ Cálculo da distância se solicitado
   const [distanciaMetros, setDistanciaMetros] = useState(null);
 
   useEffect(() => {
@@ -66,7 +82,7 @@ export function MiniCard({
         borderRadius: 8,
         width: '95%',
       }}>
-      {/* Esquerda: Nome e marca */}
+      {/* 🧱 Esquerda: Nome + Marca ou Mercado + Distância */}
       <View style={{ flex: 1, marginRight: 8 }}>
         <Text
           style={{ fontWeight: 'bold', fontSize: 14 }}
@@ -76,6 +92,7 @@ export function MiniCard({
             ? item.mercado
             : produto?.nome || 'Nome não disponível'}
         </Text>
+
         <Text
           style={{ fontSize: 12, color: '#555' }}
           numberOfLines={1}
@@ -88,8 +105,9 @@ export function MiniCard({
         </Text>
       </View>
 
-      {/* Direita: Preço */}
+      {/* 💰 Direita: Preço + Data */}
       <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
+        {/* Preço */}
         <Text
           numberOfLines={1}
           ellipsizeMode="tail"
@@ -98,11 +116,18 @@ export function MiniCard({
             fontWeight: 'bold',
             color:
               precoComparativo !== null
-                ? corDoPrecoComparado(item.preco, precoComparativo) // 🟢🔴🔵 quando for outro mercado
-                : '#007bff', // 🔵 sempre azul para o carrinho            textAlign: 'right',
+                ? corDoPrecoComparado(item.preco, precoComparativo)
+                : '#007bff',
           }}>
           R$ {item.preco?.toFixed(2)}
         </Text>
+
+        {/* 📅 Data da leitura (opcional) */}
+        {item.timestamp && (
+          <Text style={{ fontSize: 10, color: '#777', marginTop: 2 }}>
+            {exibirData(item.timestamp)}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -212,7 +237,7 @@ const styles = StyleSheet.create({
   },
   descricao: {
     fontSize: 13,
-    color: '#666',
+    color: '#777',
   },
   precoContainer: {
     minWidth: 80,

@@ -26,12 +26,8 @@ import { Vibration } from 'react-native';
 import { Audio } from 'expo-av';
 import sucesso from './assets/sucesso.mp3';
 import { calcularResumoCarrinho } from './Utils';
-import { haversineDistance } from './Utils'; // função de distância já presente no seu projeto
-
-// Estilos centralizados
+import { haversineDistance } from './Utils';
 import { styles } from './Styles';
-
-// Funções utilitárias
 import {
   db,
   firebaseTimestamp,
@@ -42,6 +38,7 @@ import {
   formatarPreco,
   handlePrecoChange,
 } from './Utils';
+import { LineChart } from 'react-native-chart-kit';
 
 // Componentes reutilizáveis
 
@@ -141,67 +138,68 @@ export function BarcodeScannerScreen({ navigation }) {
   const [mercadoProximo, setMercadoProximo] = useState(null);
   const [variacaoCarrinho, setVariacaoCarrinho] = useState(0);
   const [leiturasOutros, setLeiturasOutros] = useState([]);
+  const [linhaDoTempo, setLinhaDoTempo] = useState([]);
 
   //executa a consulta no Firebase sempre que um novo produto for selecionado no carrinho
   useEffect(() => {
-  const carregarLeiturasOutrosMercados = async () => {
-    if (!produtoSelecionado?.codigo || !mercadoProximo) return;
+    const carregarLeiturasOutrosMercados = async () => {
+      if (!produtoSelecionado?.codigo || !mercadoProximo) return;
 
-    try {
-      const snapshot = await db
-        .collection('leituras')
-        .where('codigo', '==', produtoSelecionado.codigo)
-        .orderBy('timestamp', 'desc')
-        .limit(50) // buscamos várias para garantir que temos amostras recentes
-        .get();
+      try {
+        const snapshot = await db
+          .collection('leituras')
+          .where('codigo', '==', produtoSelecionado.codigo)
+          .orderBy('timestamp', 'desc')
+          .limit(50) // buscamos várias para garantir que temos amostras recentes
+          .get();
 
-      const leituras = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((item) => typeof item.preco === 'number' && item.mercado);
+        const leituras = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((item) => typeof item.preco === 'number' && item.mercado);
 
-      // Agrupa por mercado, pegando apenas a leitura mais recente de cada mercado
-      const ultimaLeituraPorMercado = {};
-      for (const leitura of leituras) {
-        if (!ultimaLeituraPorMercado[leitura.mercado]) {
-          ultimaLeituraPorMercado[leitura.mercado] = leitura;
+        // Agrupa por mercado, pegando apenas a leitura mais recente de cada mercado
+        const ultimaLeituraPorMercado = {};
+        for (const leitura of leituras) {
+          if (!ultimaLeituraPorMercado[leitura.mercado]) {
+            ultimaLeituraPorMercado[leitura.mercado] = leitura;
+          }
         }
+
+        // Transforma em array e filtra
+        const leiturasFiltradas = Object.values(ultimaLeituraPorMercado).filter(
+          (leitura) => {
+            // Ignora o próprio mercado atual
+            if (leitura.mercado === mercadoProximo.nome) return false;
+
+            // Garante que tenha geopoint válido
+            if (!leitura.geopoint) return false;
+
+            // Calcula a distância até o mercado atual
+            const distanciaKm = calcularDistancia(
+              mercadoProximo.coordenadas.latitude,
+              mercadoProximo.coordenadas.longitude,
+              leitura.geopoint.latitude,
+              leitura.geopoint.longitude
+            );
+
+            leitura.distanciaKm = distanciaKm; // salva para usar na ordenação depois
+
+            return distanciaKm <= 20; // mantém apenas se for até 20km
+          }
+        );
+
+        // Ordena por distância crescente
+        leiturasFiltradas.sort((a, b) => a.distanciaKm - b.distanciaKm);
+
+        // Atualiza o estado com os resultados
+        setLeiturasOutros(leiturasFiltradas);
+      } catch (error) {
+        console.error('Erro ao buscar leituras de outros mercados:', error);
       }
+    };
 
-      // Transforma em array e filtra
-      const leiturasFiltradas = Object.values(ultimaLeituraPorMercado)
-        .filter((leitura) => {
-          // Ignora o próprio mercado atual
-          if (leitura.mercado === mercadoProximo.nome) return false;
-
-          // Garante que tenha geopoint válido
-          if (!leitura.geopoint) return false;
-
-          // Calcula a distância até o mercado atual
-          const distanciaKm = calcularDistancia(
-            mercadoProximo.coordenadas.latitude,
-            mercadoProximo.coordenadas.longitude,
-            leitura.geopoint.latitude,
-            leitura.geopoint.longitude
-          );
-
-          leitura.distanciaKm = distanciaKm; // salva para usar na ordenação depois
-
-          return distanciaKm <= 20; // mantém apenas se for até 20km
-        });
-
-      // Ordena por distância crescente
-      leiturasFiltradas.sort((a, b) => a.distanciaKm - b.distanciaKm);
-
-      // Atualiza o estado com os resultados
-      setLeiturasOutros(leiturasFiltradas);
-    } catch (error) {
-      console.error('Erro ao buscar leituras de outros mercados:', error);
-    }
-  };
-
-  carregarLeiturasOutrosMercados();
-}, [produtoSelecionado?.codigo, mercadoProximo]);
-
+    carregarLeiturasOutrosMercados();
+  }, [produtoSelecionado?.codigo, mercadoProximo]);
 
   // Busca mercado ao abrir a tela
   useEffect(() => {
@@ -251,6 +249,51 @@ export function BarcodeScannerScreen({ navigation }) {
       }
     })();
   }, []);
+
+  //Carregue os dados da linha do tempo
+  useEffect(() => {
+    const carregarLinhaDoTempo = async () => {
+      if (!produtoSelecionado?.codigo || !mercadoProximo?.nome) return;
+
+      try {
+        const snapshot = await db
+          .collection('leituras')
+          .where('codigo', '==', produtoSelecionado.codigo)
+          .where('mercado', '==', mercadoProximo.nome)
+          .orderBy('timestamp', 'desc')
+          .limit(50) // traz mais para garantir variedade de dias
+          .get();
+
+        const leituras = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((doc) => typeof doc.preco === 'number' && doc.timestamp);
+
+        // Agrupar por data (ignorando horas/minutos)
+        const ultimaLeituraPorDia = {};
+
+        for (const leitura of leituras) {
+          const data = leitura.timestamp.toDate();
+          const chaveDia = data.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
+          // Só adiciona se ainda não tiver leitura desse dia
+          if (!ultimaLeituraPorDia[chaveDia]) {
+            ultimaLeituraPorDia[chaveDia] = leitura;
+          }
+        }
+
+        // Transforma em array e ordena por data decrescente
+        const leiturasFiltradas = Object.values(ultimaLeituraPorDia).sort(
+          (a, b) => b.timestamp.toDate() - a.timestamp.toDate()
+        );
+
+        setLinhaDoTempo(leiturasFiltradas);
+      } catch (error) {
+        console.error('Erro ao buscar histórico do produto:', error);
+      }
+    };
+
+    carregarLinhaDoTempo();
+  }, [produtoSelecionado?.codigo, mercadoProximo?.nome]);
 
   useEffect(() => {
     if (leiturasHoje.length > 0) {
@@ -480,6 +523,27 @@ export function BarcodeScannerScreen({ navigation }) {
   const screenHeight = Dimensions.get('window').height;
   const headerHeight = useHeaderHeight();
   const usableHeight = screenHeight - headerHeight;
+
+  // 📊 Prepara os dados do gráfico de linha da linha do tempo
+  const dadosGrafico = {
+    labels: linhaDoTempo
+      .map((item) => {
+        const data = item.timestamp.toDate();
+        return `${data.getDate().toString().padStart(2, '0')}/${(
+          data.getMonth() + 1
+        )
+          .toString()
+          .padStart(2, '0')}`; // formato DD/MM
+      })
+      .reverse(), // do mais antigo para o mais recente
+    datasets: [
+      {
+        data: linhaDoTempo.map((item) => item.preco).reverse(), // mesmos índices da label
+        color: () => '#007bff', // cor da linha
+        strokeWidth: 2, // espessura da linha
+      },
+    ],
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f4f4f4' }}>
@@ -804,10 +868,37 @@ export function BarcodeScannerScreen({ navigation }) {
                   alignItems: 'center',
                   padding: 10,
                 }}>
-                {/* Conteúdo futuro do gráfico virá aqui */}
-                <Text style={{ fontSize: 12, color: '#666' }}>
-                  (Gráfico aqui)
-                </Text>
+                {linhaDoTempo.length < 2 ? (
+                  <Text style={{ color: '#555', fontSize: 12 }}>
+                    Não há dados suficientes para exibir o gráfico
+                  </Text>
+                ) : (
+                  <LineChart
+                    data={dadosGrafico}
+                    width={Dimensions.get('window').width * 0.45} // 48% da tela com padding
+                    height={200}
+                    fromZero={true}
+                    chartConfig={{
+                      backgroundColor: '#e0e0e0',
+                      backgroundGradientFrom: '#e0e0e0',
+                      backgroundGradientTo: '#e0e0e0',
+                      decimalPlaces: 2,
+                      color: (opacity = 1) => `rgba(0, 123, 255, ${opacity})`,
+                      labelColor: () => '#333',
+                      style: { borderRadius: 12 },
+                      propsForDots: {
+                        r: '5',
+                        strokeWidth: '2',
+                        stroke: '#007bff',
+                      },
+                    }}
+                    bezier
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 12,
+                    }}
+                  />
+                )}
               </View>
 
               {/* 🏪 Outros Mercados */}
@@ -827,7 +918,7 @@ export function BarcodeScannerScreen({ navigation }) {
                   <Text
                     style={{
                       fontSize: 12,
-                      color: '#666',
+                      color: '#777',
                       textAlign: 'center',
                     }}>
                     Nenhuma leitura encontrada
