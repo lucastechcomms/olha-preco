@@ -17,7 +17,8 @@ export function MiniCard({
   selecionado,
   exibirMercado = false,
   localizacaoUsuario = null,
-  precoComparativo = null, // ✅ Recebe média para comparação
+  precoComparativo = null, // Recebe média para comparação
+  modoLocalizacao = false, // Para Distância/Preço
 }) {
   const [produto, setProduto] = useState(null);
 
@@ -97,7 +98,9 @@ export function MiniCard({
           style={{ fontSize: 12, color: '#555' }}
           numberOfLines={1}
           ellipsizeMode="tail">
-          {exibirMercado
+          {modoLocalizacao
+            ? item.cidade || 'Cidade não informada'
+            : exibirMercado
             ? distanciaMetros !== null
               ? `${formatarDistancia(distanciaMetros)}`
               : ''
@@ -108,22 +111,37 @@ export function MiniCard({
       {/* 💰 Direita: Preço + Data */}
       <View style={{ alignItems: 'flex-end', flexShrink: 1 }}>
         {/* Preço */}
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          style={{
-            fontSize: 16,
-            fontWeight: 'bold',
-            color:
-              precoComparativo !== null
-                ? corDoPrecoComparado(item.preco, precoComparativo)
-                : '#007bff',
-          }}>
-          R$ {item.preco?.toFixed(2)}
-        </Text>
+        {modoLocalizacao ? (
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: '#000',
+            }}>
+            {distanciaMetros !== null
+              ? formatarDistancia(distanciaMetros)
+              : 'Distância não disponível'}
+          </Text>
+        ) : (
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{
+              fontSize: 16,
+              fontWeight: 'bold',
+              color:
+                precoComparativo !== null
+                  ? corDoPrecoComparado(item.preco, precoComparativo)
+                  : '#007bff',
+            }}>
+            R$ {item.preco?.toFixed(2)}
+          </Text>
+        )}
 
         {/* 📅 Data da leitura (opcional) */}
-        {item.timestamp && (
+        {!modoLocalizacao && item.timestamp && (
           <Text style={{ fontSize: 10, color: '#777', marginTop: 2 }}>
             {exibirData(item.timestamp)}
           </Text>

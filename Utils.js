@@ -34,16 +34,9 @@ export const firebaseTimestamp = () => firebase.firestore.FieldValue.serverTimes
 // 📦 Constantes do domínio
 // ==============================
 
-export const categorias = ["Alimentos", "Bebidas", "Higiene", "Limpeza", "Papelaria", "Outros"];
+// Lista única de unidades disponíveis para qualquer produto
+export const unidadesDisponiveis = [ "un", "kg", "g", "mg", "l", "ml"];
 
-export const unidadesPorCategoria = {
-  Alimentos: ["kg", "g", "un"],
-  Bebidas: ["L", "ml"],
-  Higiene: ["un"],
-  Limpeza: ["L", "ml", "un"],
-  Papelaria: ["un"],
-  Outros: ["un"]
-};
 
 // ==============================
 // 📍 Geolocalização
@@ -70,12 +63,18 @@ export function encontrarMercadoProximo(latitude, longitude, mercados) {
   let distanciaMinima = Infinity;
 
   mercados.forEach((mercado) => {
+    const coords = mercado.coordenadas;
+    if (!coords || coords.latitude === undefined || coords.longitude === undefined) {
+      return; // pula mercados com coordenadas inválidas
+    }
+
     const distancia = calcularDistancia(
       latitude,
       longitude,
-      mercado.coordenadas.latitude,
-      mercado.coordenadas.longitude
+      coords.latitude,
+      coords.longitude
     );
+
     if (distancia < distanciaMinima) {
       distanciaMinima = distancia;
       mercadoMaisProximo = mercado;
@@ -84,6 +83,7 @@ export function encontrarMercadoProximo(latitude, longitude, mercados) {
 
   return mercadoMaisProximo;
 }
+
 
 // ==============================
 // 💲 Preço

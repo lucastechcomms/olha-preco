@@ -39,6 +39,7 @@ import {
   handlePrecoChange,
 } from './Utils';
 import { LineChart } from 'react-native-chart-kit';
+import { unidadesDisponiveis } from './Utils';
 
 // Componentes reutilizáveis
 
@@ -65,11 +66,26 @@ export function HomeScreen({ navigation }) {
       const { latitude, longitude } = location.coords;
 
       const snapshot = await db.collection('mercados').get();
-      const mercados = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        nome: doc.data().Nome,
-        coordenadas: doc.data().Coordenadas,
-      }));
+      const mercados = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const coords = data.coordenadas; //Correção no firebase "C" para "c"
+
+          if (
+            !coords ||
+            coords.latitude === undefined ||
+            coords.longitude === undefined
+          ) {
+            return null;
+          }
+
+          return {
+            id: doc.id,
+            nome: data.Nome,
+            coordenadas: coords,
+          };
+        })
+        .filter((m) => m !== null);
 
       const mercado = encontrarMercadoProximo(latitude, longitude, mercados);
 
@@ -113,8 +129,8 @@ export function HomeScreen({ navigation }) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate('Histórico')}>
-        <Text style={styles.buttonText}>Histórico</Text>
+        onPress={() => navigation.navigate('Mercados Próximos')}>
+        <Text style={styles.buttonText}>Mercados Próximos</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -229,11 +245,26 @@ export function BarcodeScannerScreen({ navigation }) {
       const { latitude, longitude } = location.coords;
 
       const snapshot = await db.collection('mercados').get();
-      const mercados = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        nome: doc.data().Nome,
-        coordenadas: doc.data().Coordenadas,
-      }));
+      const mercados = snapshot.docs
+        .map((doc) => {
+          const data = doc.data();
+          const coords = data.coordenadas; //Correção no firebase "C" para "c"
+
+          if (
+            !coords ||
+            coords.latitude === undefined ||
+            coords.longitude === undefined
+          ) {
+            return null;
+          }
+
+          return {
+            id: doc.id,
+            nome: data.Nome,
+            coordenadas: coords,
+          };
+        })
+        .filter((m) => m !== null);
 
       const mercado = encontrarMercadoProximo(latitude, longitude, mercados);
 
@@ -965,64 +996,144 @@ export function BarcodeScannerScreen({ navigation }) {
 }
 
 // =========================
-// 📋 TELA: HISTÓRICO
+// 📍 TELA: MERCADOS PRÓXIMOS
 // =========================
-export function RegistrosScreen({ navigation }) {
-  const [registros, setRegistros] = useState([]);
-  const [filtro, setFiltro] = useState('');
+export function MercadosProximosScreen({ navigation }) {
+  const [mercadosProximos, setMercadosProximos] = useState([]);
+  const [localizacao, setLocalizacao] = useState(null);
+  const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const carregarDados = async () => {
       try {
-        const snapshot = await db
-          .collection('leituras')
-          .orderBy('timestamp', 'desc')
-          .limit(20)
-          .get();
-        const dados = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setRegistros(dados);
-      } catch (error) {
-        console.error('Erro ao buscar documentos:', error.message || error);
-        Alert.alert(
-          'Erro',
-          `Falha ao buscar documentos. ERROR ID:  ${error.message || error}`
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permissão negada',
+            'Não foi possível acessar a localização.'
+          );
+          setCarregando(false);
+          return;
+        }
+
+        const location =
+          (await Location.getLastKnownPositionAsync()) ||
+          (await Location.getCurrentPositionAsync());
+
+        if (!location) {
+          Alert.alert('Erro', 'Não foi possível obter sua localização atual.');
+          setCarregando(false);
+          return;
+        }
+
+        const { latitude, longitude } = location.coords;
+        setLocalizacao({ latitude, longitude });
+
+        const snapshot = await db.collection('mercados').get();
+
+        if (snapshot.empty) {
+          Alert.alert('Nenhum mercado encontrado no banco de dados.');
+          setCarregando(false);
+          return;
+        }
+
+        const mercados = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            const coordenadas = data.coordenadas; //Correção no firebase "C" para "c"
+
+            // Verifica se coordenadas estão presentes
+            if (
+              !coordenadas ||
+              coordenadas.latitude === undefined ||
+              coordenadas.longitude === undefined
+            ) {
+              return null; // Ignora este mercado
+            }
+
+            const distancia = calcularDistancia(
+              latitude,
+              longitude,
+              coordenadas.latitude,
+              coordenadas.longitude
+            );
+
+            return {
+              id: doc.id,
+              nome: data.Nome,
+              cidade: data.Cidade || 'Cidade não informada', // 👈 aqui garantimos que terá cidade
+              geopoint: coordenadas,
+              distanciaKm: distancia,
+            };
+          })
+          .filter((item) => item !== null); // Remove os nulos
+
+        const maisProximos = mercados
+          .sort((a, b) => a.distanciaKm - b.distanciaKm)
+          .slice(0, 20);
+
+        console.log('📡 Localização obtida:', latitude, longitude);
+        console.log(
+          '📦 Mercados carregados do Firebase:',
+          snapshot.docs.length
         );
+        console.log('✅ Mercados com coordenadas válidas:', mercados.length);
+        console.log('🏪 Mercados mais próximos:', maisProximos);
+
+        setMercadosProximos(maisProximos);
+      } catch (erro) {
+        console.error('Erro ao carregar mercados próximos:', erro);
+        Alert.alert('Erro', 'Falha ao carregar os mercados próximos.');
+      } finally {
+        setCarregando(false);
       }
     };
-    fetchData();
-  }, []);
 
-  const registrosFiltrados = registros.filter((item) =>
-    item.codigo?.toLowerCase().includes(filtro.toLowerCase())
-  );
+    carregarDados();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Últimos Registros</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Filtrar por código de barras..."
-        value={filtro}
-        onChangeText={setFiltro}
-      />
-      <FlatList
-        contentContainerStyle={{
-          paddingBottom: 100,
-          alignItems: 'center',
-          width: '100%',
-        }}
-        data={registrosFiltrados}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <RegistroItem item={item} />}
-      />
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.goBack()}>
-        <Text style={styles.buttonText}>Voltar</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Mercados Próximos</Text>
+
+      {carregando ? (
+        <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>
+          Buscando mercados próximos...
+        </Text>
+      ) : mercadosProximos.length === 0 ? (
+        <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>
+          Nenhum mercado encontrado próximo à sua localização.
+        </Text>
+      ) : (
+        <FlatList
+          data={mercadosProximos}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => {
+            console.log('🛒 Item do mercado:', item);
+            // Cria um objeto com os campos que o MiniCard espera
+            // 🔧 Adapta os campos esperados pelo MiniCard com segurança
+            const itemFormatado = {
+              id: item.id,
+              mercado: item.nome || 'Mercado sem nome',
+              cidade: item.cidade || 'Cidade não informada',
+              preco: 0, // obrigatório para o MiniCard, mesmo que sem preço
+              geopoint: item.geopoint || item.coordenadas || null, // garante que sempre tenha geopoint
+            };
+
+            return (
+              <MiniCard
+                item={itemFormatado}
+                modoLocalizacao={true} // mostra distância no lugar do preço
+                exibirMercado={true} // mostra nome do mercado
+                localizacaoUsuario={localizacao} // posição do usuário
+                onSelect={() => {}} // sem ação ao clicar por enquanto
+                selecionado={false}
+              />
+            );
+          }}
+          contentContainerStyle={{ paddingBottom: 16 }}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -1035,11 +1146,8 @@ export function CadastroProdutoScreen({ route, navigation }) {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
   const [marca, setMarca] = useState('');
-  const [categoria, setCategoria] = useState(categorias[0]);
   const [quantidade, setQuantidade] = useState('');
-  const [unidade, setUnidade] = useState(
-    unidadesPorCategoria[categorias[0]][0]
-  );
+  const [unidade, setUnidade] = useState(unidadesDisponiveis[0]);
 
   const cadastrarProduto = async () => {
     if (!codigo) return Alert.alert('Erro', 'Código de barras é obrigatório.');
@@ -1052,11 +1160,11 @@ export function CadastroProdutoScreen({ route, navigation }) {
           nome,
           descricao,
           marca,
-          categoria,
           quantidade: Number(quantidade),
           unidade,
           timestamp: firebaseTimestamp(),
         });
+
       Alert.alert('Sucesso', 'Produto cadastrado com sucesso!');
       navigation.goBack();
     } catch (err) {
@@ -1093,25 +1201,12 @@ export function CadastroProdutoScreen({ route, navigation }) {
         onChangeText={setMarca}
       />
 
-      <Text style={{ fontSize: 16, marginBottom: 4 }}>Categoria:</Text>
-      <Picker
-        selectedValue={categoria}
-        style={styles.input}
-        onValueChange={(itemValue) => {
-          setCategoria(itemValue);
-          setUnidade(unidadesPorCategoria[itemValue][0]);
-        }}>
-        {categorias.map((cat) => (
-          <Picker.Item label={cat} value={cat} key={cat} />
-        ))}
-      </Picker>
-
       <Text style={{ fontSize: 16, marginBottom: 4 }}>Unidade:</Text>
       <Picker
         selectedValue={unidade}
         style={styles.input}
         onValueChange={(itemValue) => setUnidade(itemValue)}>
-        {unidadesPorCategoria[categoria].map((uni) => (
+        {unidadesDisponiveis.map((uni) => (
           <Picker.Item label={uni} value={uni} key={uni} />
         ))}
       </Picker>

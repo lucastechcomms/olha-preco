@@ -12,11 +12,12 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Importação das telas
-import { 
-  HomeScreen, 
-  BarcodeScannerScreen, 
-  RegistrosScreen, 
-  CadastroProdutoScreen 
+import {
+  HomeScreen,
+  BarcodeScannerScreen,
+  RegistrosScreen,
+  CadastroProdutoScreen,
+  MercadosProximosScreen, // ✅ nova tela
 } from './Screens';
 
 // Criação da pilha de navegação
@@ -31,46 +32,41 @@ export default function App() {
     <SafeAreaProvider style={{ flex: 1 }}>
       {/* Container de Navegação */}
       <NavigationContainer>
-        
         {/* Definição da pilha de navegação */}
         <Stack.Navigator
           initialRouteName="Home" // Define a primeira tela
           screenOptions={{
             headerShown: true, // Exibe cabeçalho por padrão
             gestureEnabled: true, // Permite gestos para voltar
-          }}
-        >
-
+          }}>
           {/* Tela Inicial */}
-          <Stack.Screen 
-            name="Home" 
-            component={HomeScreen} 
-            options={{ title: 'Início' }} 
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ title: 'Início' }}
           />
 
           {/* Tela de Leitura de Código de Barras */}
-          <Stack.Screen 
-            name="Leitura" 
+          <Stack.Screen
+            name="Leitura"
             component={BarcodeScannerScreen}
             options={{ title: 'Leitura de Código' }}
           />
 
-          {/* Tela de Histórico de Leituras */}
-          <Stack.Screen 
-            name="Histórico" 
-            component={RegistrosScreen}
-            options={{ title: 'Histórico de Preços' }}
+          {/* Tela de Mercados Proximos */}
+          <Stack.Screen
+            name="Mercados Próximos"
+            component={MercadosProximosScreen}
+            options={{ title: 'Mercados Próximos' }}
           />
 
           {/* Tela de Cadastro Manual de Produto */}
-          <Stack.Screen 
-            name="Cadastrar Produto" 
+          <Stack.Screen
+            name="Cadastrar Produto"
             component={CadastroProdutoScreen}
             options={{ title: 'Cadastrar Produto' }}
           />
-
         </Stack.Navigator>
-
       </NavigationContainer>
     </SafeAreaProvider>
   );
