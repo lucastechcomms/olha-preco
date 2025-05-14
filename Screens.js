@@ -121,7 +121,7 @@ export function HomeScreen({ navigation }) {
         </View>
       )}
 
-      <Text style={styles.title}>Controle de Preços</Text>
+      <Text style={styles.title}>Olha Preço!</Text>
       <TouchableOpacity
         style={styles.button}
         onPress={() => navigation.navigate('Leitura')}>
@@ -132,6 +132,33 @@ export function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate('Mercados Próximos')}>
         <Text style={styles.buttonText}>Mercados Próximos</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('Instruções')}>
+        <Text style={styles.buttonText}>Instruções</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={() => navigation.navigate('Sugestões')}>
+        <Text style={styles.buttonText}>Sugestão</Text>
+      </TouchableOpacity>
+      <Text
+        style={{
+          fontSize: 10,
+          color: '#777',
+          marginTop: 20,
+          textAlign: 'center',
+        }}>
+        🧠 Protótipo Olha Preço! • v1.0
+      </Text>
+      <Text
+        style={{
+          fontSize: 10,
+          color: '#777',
+          textAlign: 'center',
+        }}>
+        @lucastechcomms
+      </Text>
     </SafeAreaView>
   );
 }
@@ -1222,6 +1249,124 @@ export function CadastroProdutoScreen({ route, navigation }) {
       <TouchableOpacity style={styles.button} onPress={cadastrarProduto}>
         <Text style={styles.buttonText}>Salvar Produto</Text>
       </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+// =========================
+// 📘 TELA: INSTRUÇÕES DE TESTE
+// =========================
+export function InstrucoesScreen() {
+  const produtos = [
+    { nome: 'Arroz', emoji: '🍚' },
+    { nome: 'Feijão', emoji: '🥣' },
+    { nome: 'Leite', emoji: '🥛' },
+    { nome: 'Ovos', emoji: '🥚' },
+    { nome: 'Óleo de cozinha', emoji: '🛢️' },
+  ];
+
+  return (
+    <ScrollView
+      contentContainerStyle={{
+        padding: 20,
+        backgroundColor: '#f9f9f9',
+        flexGrow: 1,
+      }}>
+      <Text
+        style={{
+          fontSize: 22,
+          fontWeight: 'bold',
+          marginBottom: 12,
+          textAlign: 'center',
+        }}>
+        🧪 Instruções para Teste
+      </Text>
+      <Text
+        style={{
+          fontSize: 16,
+          marginBottom: 20,
+          textAlign: 'center',
+          color: '#333',
+        }}>
+        Durante esta fase de teste, pedimos que você registre os preços dos
+        seguintes produtos básicos. Utilize o leitor de código de barras para
+        cada item listado abaixo:
+      </Text>
+
+      {produtos.map((item, index) => (
+        <View
+          key={index}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#fff',
+            padding: 12,
+            marginVertical: 6,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#ddd',
+          }}>
+          <Text style={{ fontSize: 28, marginRight: 12 }}>{item.emoji}</Text>
+          <Text style={{ fontSize: 18 }}>{item.nome}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+// =========================
+// 💬 TELA: SUGESTÕES
+// =========================
+export function SugestoesScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [mensagem, setMensagem] = useState('');
+  const [enviado, setEnviado] = useState(false);
+
+  const enviarSugestao = async () => {
+    try {
+      await db.collection('contato').add({
+        email,
+        mensagem,
+        timestamp: firebaseTimestamp(),
+      });
+      setEmail('');
+      setMensagem('');
+      setEnviado(true);
+      setTimeout(() => setEnviado(false), 3000); // Oculta após 3s
+    } catch (error) {
+      console.error('Erro ao enviar sugestão:', error);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Sugestões e Comentários</Text>
+
+      <TextInput
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
+        style={styles.input}
+        keyboardType="email-address"
+      />
+
+      <TextInput
+        placeholder="Escreva aqui sua sugestão..."
+        value={mensagem}
+        onChangeText={setMensagem}
+        style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
+        multiline
+      />
+
+      <TouchableOpacity style={styles.button} onPress={enviarSugestao}>
+        <Text style={styles.buttonText}>Enviar</Text>
+      </TouchableOpacity>
+
+      {enviado && (
+        <Text style={{ color: 'green', marginTop: 10, textAlign: 'center' }}>
+          Obrigado pela sua sugestão! 💬
+        </Text>
+      )}
     </ScrollView>
   );
 }

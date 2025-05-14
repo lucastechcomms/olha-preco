@@ -17,8 +17,11 @@ import {
   BarcodeScannerScreen,
   RegistrosScreen,
   CadastroProdutoScreen,
-  MercadosProximosScreen, // ✅ nova tela
+  MercadosProximosScreen,
+  InstrucoesScreen,
+  SugestoesScreen
 } from './Screens';
+
 
 // Criação da pilha de navegação
 const Stack = createStackNavigator();
@@ -58,6 +61,19 @@ export default function App() {
             name="Mercados Próximos"
             component={MercadosProximosScreen}
             options={{ title: 'Mercados Próximos' }}
+          />
+
+          {/* Tela de Instruções */}
+          <Stack.Screen
+            name="Instruções"
+            component={InstrucoesScreen}
+            options={{ title: 'Instruções' }}
+          />
+
+          <Stack.Screen
+            name="Sugestões"
+            component={SugestoesScreen}
+            options={{ title: 'Sugestões' }}
           />
 
           {/* Tela de Cadastro Manual de Produto */}
