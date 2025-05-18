@@ -1,4 +1,4 @@
-// Screens.js
+{/* Screens.js*/}
 // 🖥️ Arquivo contendo todas as telas do app (Home, Leitura, Cadastro e Histórico)
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -13,7 +13,6 @@ import {
   Button,
   Dimensions,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useFocusEffect } from '@react-navigation/native';
@@ -1229,14 +1228,25 @@ export function CadastroProdutoScreen({ route, navigation }) {
       />
 
       <Text style={{ fontSize: 16, marginBottom: 4 }}>Unidade:</Text>
-      <Picker
-        selectedValue={unidade}
-        style={styles.input}
-        onValueChange={(itemValue) => setUnidade(itemValue)}>
+      <Text style={{ fontSize: 16, marginBottom: 4 }}>Unidade:</Text>
+      <View
+        style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
         {unidadesDisponiveis.map((uni) => (
-          <Picker.Item label={uni} value={uni} key={uni} />
+          <TouchableOpacity
+            key={uni}
+            onPress={() => setUnidade(uni)}
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 12,
+              backgroundColor: unidade === uni ? '#007bff' : '#ccc',
+              borderRadius: 20,
+              marginRight: 8,
+              marginBottom: 8,
+            }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>{uni}</Text>
+          </TouchableOpacity>
         ))}
-      </Picker>
+      </View>
 
       <TextInput
         style={styles.input}

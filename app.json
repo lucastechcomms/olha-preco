@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "olha-preco",
-    "slug": "snack-1661febd-61d5-4816-a279-ae6dffa25537",
+    "name": "olha-preco-v-1",
+    "slug": "snack-08da5f92-b794-4eda-a686-4cc4dbf417df",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,10 +19,12 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "description": "github.com/lucastechcomms/olha-preco @ May 14, 2025"
   }
 }
